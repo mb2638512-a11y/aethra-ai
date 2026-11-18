@@ -13,7 +13,7 @@ The pin is intentional: model files and the native ABI must be tested against on
 
 ## Native build
 
-The \`.github/workflows/llama-android-native.yml\` workflow checks out the pinned upstream source and builds the CPU libraries with the Android NDK. It disables subprocess/video helper dependencies; AETHRA performs video frame sampling and soundtrack decoding with Android MediaExtractor/MediaCodec, then sends image/audio files as separate media parts.
+The \`.github/workflows/llama-android-native.yml\` workflow checks out the pinned upstream source and builds the CPU libraries with the Android NDK. It disables subprocess/video helper dependencies; AETHRA performs video frame sampling and soundtrack decoding with Android MediaExtractor/MediaCodec, normalizes audio to mono 16 kHz WAV, and sends image/audio files as separate media parts. Gemma 4 audio input is capped at 30 seconds.
 
 CMake options:
 - \`ANDROID_ABI=arm64-v8a\`, \`ANDROID_PLATFORM=android-28\`
