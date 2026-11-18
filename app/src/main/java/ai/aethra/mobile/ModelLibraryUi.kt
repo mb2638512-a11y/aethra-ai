@@ -51,8 +51,13 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
         ModelAssets.byModel.keys.forEach { modelId ->
             val savedIds = ModelDownloadStore.load(context, modelId)
             if (savedIds.isNotEmpty()) {
-                activeDownloads[modelId] = savedIds
-                savedIds.forEach { id -> downloader.query(id)?.let { snapshots[id] = it } }
+                val recovered = savedIds.filter { id ->
+                    val snapshot = downloader.query(id)
+                    if (snapshot != null) snapshots[id] = snapshot
+                    snapshot != null
+                }
+                if (recovered.isNotEmpty()) activeDownloads[modelId] = recovered
+                else ModelDownloadStore.clear(context, modelId)
             }
         }
         while (true) {
@@ -111,6 +116,15 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
                         file.isFile && file.length() > 0L
                     }
                     val allDone = filesPresent
+                    val hasFailed = modelSnapshots.any { it.status == DownloadManager.STATUS_FAILED }
+                    val hasActive = modelSnapshots.any {
+                        it.status == DownloadManager.STATUS_PENDING ||
+                            it.status == DownloadManager.STATUS_RUNNING ||
+                            it.status == DownloadManager.STATUS_PAUSED
+                    }
+                    val filesPresentCount = assets.count { asset ->
+                        java.io.File(downloader.modelDirectory(), asset.fileName).let { it.isFile && it.length() > 0L }
+                    }
                     val progress = if (modelSnapshots.isNotEmpty()) {
                         modelSnapshots.map { it.progressPercent }.average().toFloat() / 100f
                     } else 0f
@@ -145,8 +159,8 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
                             if (ids.isNotEmpty()) {
                                 LinearProgressIndicator(progress = { progress }, modifier = Modifier.fillMaxWidth())
                                 Text(
-                                    if (allDone) "Assets downloaded. Runtime loading and integrity checks still required."
-                                    else "${done}/${total} files completed",
+                                    if (allDone) "All ${total} model files present. Integrity checks apply at runtime load."
+                                    else "${filesPresentCount}/${total} files present • ${done}/${total} downloads completed",
                                     style = MaterialTheme.typography.labelSmall
                                 )
                                 modelSnapshots.filter { it.status == DownloadManager.STATUS_FAILED }.forEach {
@@ -158,15 +172,22 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
                                     OutlinedButton(onClick = { onRunModel(model); onDismiss() }) { Text("Run") }
                                 }
                                 Button(
-                                    enabled = assets.isNotEmpty() && ids.isEmpty() && !allDone,
+                                    enabled = assets.isNotEmpty() && !allDone && !hasActive,
                                     onClick = {
                                         runCatching {
                                             val device = ModelExecutionPolicy.inspect(context)
                                             check(device.freeStorageGb >= 3.0) { "At least 3 GB free storage is required for this download." }
-                                            downloader.enqueueModel(model.id)
-                                        }.onSuccess {
-                                            activeDownloads[model.id] = it
-                                            ModelDownloadStore.save(context, model.id, it)
+                                            val failedIds = modelSnapshots.filter { it.status == DownloadManager.STATUS_FAILED }.map { it.id }
+                                            if (failedIds.isNotEmpty()) downloader.cancel(*failedIds.toLongArray())
+                                            downloader.enqueueMissingModel(model.id)
+                                        }.onSuccess { newIds ->
+                                            if (newIds.isEmpty()) {
+                                                activeDownloads.remove(model.id)
+                                                ModelDownloadStore.clear(context, model.id)
+                                            } else {
+                                                activeDownloads[model.id] = newIds
+                                                ModelDownloadStore.save(context, model.id, newIds)
+                                            }
                                         }
                                     }
                                 ) {
@@ -174,17 +195,24 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
                                         when {
                                             allDone -> "Downloaded"
                                             assets.isEmpty() -> "Download integration pending"
-                                            ids.isEmpty() -> "Download"
-                                            else -> "Queued"
+                                            hasActive -> "Downloading…"
+                                            hasFailed -> "Retry failed files"
+                                            ids.isNotEmpty() -> "Resume missing files"
+                                            else -> "Download"
                                         }
                                     )
                                 }
                                 OutlinedButton(onClick = {
                                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(model.officialModelUrl)))
                                 }) { Text("Official source") }
-                                if (ids.isNotEmpty() && !allDone) {
+                                if (ids.isNotEmpty() && !allDone && hasActive) {
                                     TextButton(onClick = {
-                                        downloader.cancel(*ids.toLongArray())
+                                        val activeIds = modelSnapshots.filter {
+                                            it.status == DownloadManager.STATUS_PENDING ||
+                                                it.status == DownloadManager.STATUS_RUNNING ||
+                                                it.status == DownloadManager.STATUS_PAUSED
+                                        }.map { it.id }
+                                        downloader.cancel(*activeIds.toLongArray())
                                         activeDownloads.remove(model.id)
                                         ModelDownloadStore.clear(context, model.id)
                                     }) { Text("Cancel") }
