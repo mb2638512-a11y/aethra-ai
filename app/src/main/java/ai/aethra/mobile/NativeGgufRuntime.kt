@@ -14,6 +14,7 @@ object NativeGgufRuntime {
 
     external fun nativeLoadModel(modelPath: String, projectorPath: String?): Boolean
     external fun nativeGenerate(prompt: String, mediaPaths: Array<String>, maxTokens: Int = 256): String
+    external fun nativeGenerateStream(prompt: String, mediaPaths: Array<String>, maxTokens: Int, callback: NativeTokenCallback)
     external fun nativeCancel()
     external fun nativeUnload()
     external fun nativeCapabilities(): String
