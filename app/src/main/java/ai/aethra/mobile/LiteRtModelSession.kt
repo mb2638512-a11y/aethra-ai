@@ -5,6 +5,7 @@ import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.ConversationConfig
+import com.google.ai.edge.litertlm.Content
 import com.google.ai.edge.litertlm.Contents
 import com.google.ai.edge.litertlm.SamplerConfig
 import kotlinx.coroutines.Dispatchers
@@ -34,6 +35,8 @@ class LiteRtModelSession(
             EngineConfig(
                 modelPath = modelPath,
                 backend = Backend.CPU(),
+                visionBackend = Backend.CPU(),
+                audioBackend = Backend.CPU(),
             )
         )
         try {
@@ -51,11 +54,18 @@ class LiteRtModelSession(
         }
     }
 
-    fun generate(prompt: String): Flow<String> = flow {
-        require(prompt.isNotBlank()) { "Prompt cannot be empty." }
+    fun generate(prompt: String): Flow<String> = generate(Contents.of(prompt))
+
+    fun generateImage(prompt: String, imagePath: String): Flow<String> =
+        generate(Contents.of(Content.Text(prompt), Content.ImageFile(imagePath)))
+
+    fun generateAudio(prompt: String, audioPath: String): Flow<String> =
+        generate(Contents.of(Content.Text(prompt), Content.AudioFile(audioPath)))
+
+    fun generate(contents: Contents): Flow<String> = flow {
         val activeConversation = conversation
             ?: error("Model is not loaded. Open the session first.")
-        activeConversation.sendMessageAsync(prompt).collect { message ->
+        activeConversation.sendMessageAsync(contents).collect { message ->
             emit(message.toString())
         }
     }.flowOn(Dispatchers.IO)
