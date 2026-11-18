@@ -39,11 +39,86 @@ void throw_illegal_state(JNIEnv * env, const std::string & message) {
 
 std::string from_java(JNIEnv * env, jstring value) {
     if (value == nullptr) return {};
-    const char * chars = env->GetStringUTFChars(value, nullptr);
+    const jsize length = env->GetStringLength(value);
+    const jchar * chars = env->GetStringChars(value, nullptr);
     if (chars == nullptr) return {};
-    std::string result(chars);
-    env->ReleaseStringUTFChars(value, chars);
+
+    std::string result;
+    result.reserve(static_cast<size_t>(length) * 3);
+    for (jsize index = 0; index < length; ++index) {
+        uint32_t codepoint = chars[index];
+        if (codepoint >= 0xD800 && codepoint <= 0xDBFF && index + 1 < length) {
+            const uint32_t low = chars[index + 1];
+            if (low >= 0xDC00 && low <= 0xDFFF) {
+                codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low - 0xDC00);
+                ++index;
+            } else {
+                codepoint = 0xFFFD;
+            }
+        } else if (codepoint >= 0xDC00 && codepoint <= 0xDFFF) {
+            codepoint = 0xFFFD;
+        }
+
+        if (codepoint <= 0x7F) {
+            result.push_back(static_cast<char>(codepoint));
+        } else if (codepoint <= 0x7FF) {
+            result.push_back(static_cast<char>(0xC0 | (codepoint >> 6)));
+            result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        } else if (codepoint <= 0xFFFF) {
+            result.push_back(static_cast<char>(0xE0 | (codepoint >> 12)));
+            result.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+            result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        } else {
+            result.push_back(static_cast<char>(0xF0 | (codepoint >> 18)));
+            result.push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+            result.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+            result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        }
+    }
+    env->ReleaseStringChars(value, chars);
     return result;
+}
+
+jstring to_java(JNIEnv * env, const std::string & value) {
+    std::vector<jchar> utf16;
+    utf16.reserve(value.size());
+    const auto * bytes = reinterpret_cast<const uint8_t *>(value.data());
+    size_t index = 0;
+    while (index < value.size()) {
+        uint32_t codepoint = 0xFFFD;
+        const uint8_t first = bytes[index++];
+        if (first <= 0x7F) {
+            codepoint = first;
+        } else if ((first & 0xE0) == 0xC0 && index < value.size() &&
+                   (bytes[index] & 0xC0) == 0x80) {
+            codepoint = ((first & 0x1F) << 6) | (bytes[index++] & 0x3F);
+            if (codepoint < 0x80) codepoint = 0xFFFD;
+        } else if ((first & 0xF0) == 0xE0 && index + 1 < value.size() &&
+                   (bytes[index] & 0xC0) == 0x80 && (bytes[index + 1] & 0xC0) == 0x80) {
+            codepoint = ((first & 0x0F) << 12) |
+                        ((bytes[index] & 0x3F) << 6) | (bytes[index + 1] & 0x3F);
+            index += 2;
+            if (codepoint < 0x800 || (codepoint >= 0xD800 && codepoint <= 0xDFFF)) codepoint = 0xFFFD;
+        } else if ((first & 0xF8) == 0xF0 && index + 2 < value.size() &&
+                   (bytes[index] & 0xC0) == 0x80 &&
+                   (bytes[index + 1] & 0xC0) == 0x80 &&
+                   (bytes[index + 2] & 0xC0) == 0x80) {
+            codepoint = ((first & 0x07) << 18) |
+                        ((bytes[index] & 0x3F) << 12) |
+                        ((bytes[index + 1] & 0x3F) << 6) | (bytes[index + 2] & 0x3F);
+            index += 3;
+            if (codepoint < 0x10000 || codepoint > 0x10FFFF) codepoint = 0xFFFD;
+        }
+
+        if (codepoint <= 0xFFFF) {
+            utf16.push_back(static_cast<jchar>(codepoint));
+        } else {
+            codepoint -= 0x10000;
+            utf16.push_back(static_cast<jchar>(0xD800 + (codepoint >> 10)));
+            utf16.push_back(static_cast<jchar>(0xDC00 + (codepoint & 0x3FF)));
+        }
+    }
+    return env->NewString(utf16.data(), static_cast<jsize>(utf16.size()));
 }
 
 void unload_locked() {
@@ -307,7 +382,7 @@ Java_ai_aethra_mobile_NativeGgufRuntime_nativeGenerate(
             }
         }
         const std::string result = generate_locked(prompt_text, paths, max_tokens);
-        return env->NewStringUTF(result.c_str());
+        return to_java(env, result);
     } catch (const std::exception & error) {
         log_error(error.what());
         throw_illegal_state(env, error.what());
@@ -344,10 +419,10 @@ Java_ai_aethra_mobile_NativeGgufRuntime_nativeCapabilities(JNIEnv * env, jobject
          << "\"audioGeneration\":" << (caps.audio_gen ? "true" : "false") << ","
          << "\"speakerReference\":" << (caps.audio_gen_spk_ref ? "true" : "false")
          << "}";
-    return env->NewStringUTF(json.str().c_str());
+    return to_java(env, json.str());
 }
 
 extern "C" JNIEXPORT jstring JNICALL
 Java_ai_aethra_mobile_NativeGgufRuntime_nativeSystemInfo(JNIEnv * env, jobject) {
-    return env->NewStringUTF(llama_print_system_info());
+    return to_java(env, llama_print_system_info());
 }
