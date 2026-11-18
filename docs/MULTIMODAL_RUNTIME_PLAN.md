@@ -43,10 +43,10 @@ Settings may let users request a higher concurrency value, but the effective val
 
 ## Current verified implementation
 
-- Gemma 4 E2B: LiteRT-LM Kotlin session adapter exists; current AETHRA chat path is text-only.
+- Gemma 4 E2B: LiteRT-LM Kotlin adapter is configured with CPU, vision and audio backends. Text, image and audio inputs are routed into LiteRT-LM Content; video is sampled into up to four image frames; PDF pages are rendered into up to four images; plain-text documents are appended to the prompt. Video audio-track extraction is not implemented. Physical-device modality tests remain pending.
 - LFM3-Omni-2B: main GGUF and projector download manifest exists; Android llama.cpp/libmtmd runtime is not integrated.
 - MiniCPM-V 4.6: GGUF and projector download manifest exists; Android llama.cpp runtime is not integrated.
-- Image generation, audio generation, and video generation: catalogue entries only; no complete Android generation pipeline is integrated.
+- Image generation, audio generation and video generation: catalogue entries only; no dedicated Android generation pipeline is integrated. Android system TextToSpeech is available for reading text responses but is not a generative audio model.
 - Physical-device tests: not yet performed.
 
 ## Delivery gates
