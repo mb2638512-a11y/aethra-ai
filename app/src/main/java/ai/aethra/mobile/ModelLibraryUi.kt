@@ -48,6 +48,13 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
     val categories = listOf("All") + ModelCatalogue.candidates.map { it.category }.distinct().sorted()
 
     LaunchedEffect(Unit) {
+        ModelAssets.byModel.keys.forEach { modelId ->
+            val savedIds = ModelDownloadStore.load(context, modelId)
+            if (savedIds.isNotEmpty()) {
+                activeDownloads[modelId] = savedIds
+                savedIds.forEach { id -> downloader.query(id)?.let { snapshots[id] = it } }
+            }
+        }
         while (true) {
             activeDownloads.values.flatten().forEach { id ->
                 downloader.query(id)?.let { snapshots[id] = it }
@@ -157,7 +164,10 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
                                             val device = ModelExecutionPolicy.inspect(context)
                                             check(device.freeStorageGb >= 3.0) { "At least 3 GB free storage is required for this download." }
                                             downloader.enqueueModel(model.id)
-                                        }.onSuccess { activeDownloads[model.id] = it }
+                                        }.onSuccess {
+                                            activeDownloads[model.id] = it
+                                            ModelDownloadStore.save(context, model.id, it)
+                                        }
                                     }
                                 ) {
                                     Text(
@@ -176,6 +186,7 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
                                     TextButton(onClick = {
                                         downloader.cancel(*ids.toLongArray())
                                         activeDownloads.remove(model.id)
+                                        ModelDownloadStore.clear(context, model.id)
                                     }) { Text("Cancel") }
                                 }
                             }
