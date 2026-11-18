@@ -76,6 +76,21 @@ object ModelAssets {
  * Uses Android's system DownloadManager so large model downloads can continue
  * outside the app process. Model files stay in the app-specific external folder.
  */
+object ModelDownloadStore {
+    private const val PREFS = "aethra_model_downloads"
+    fun save(context: Context, modelId: String, ids: List<Long>) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(modelId, ids.joinToString(","))
+            .apply()
+    }
+    fun load(context: Context, modelId: String): List<Long> =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(modelId, null)
+            ?.split(",")?.mapNotNull { it.toLongOrNull() }.orEmpty()
+    fun clear(context: Context, modelId: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(modelId).apply()
+    }
+}
+
 class ModelDownloadManager(context: Context) {
     private val appContext = context.applicationContext
     private val manager = appContext.getSystemService(DownloadManager::class.java)
