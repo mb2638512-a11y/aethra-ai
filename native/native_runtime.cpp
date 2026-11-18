@@ -355,7 +355,7 @@ std::string generate_locked(const std::string & prompt,
     }
 
     llama_sampler_free(sampler);
-    if (!pending_utf8.empty()) emit_callback_bytes(pending_utf8);
+    if (!pending_utf8.empty() && (callback_env == nullptr || !callback_env->ExceptionCheck())) emit_callback_bytes(pending_utf8);
     return output;
 }
 
