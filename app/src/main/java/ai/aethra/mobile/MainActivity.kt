@@ -1,6 +1,13 @@
 package ai.aethra.mobile
 
 import android.os.Bundle
+import android.net.Uri
+import android.provider.OpenableColumns
+import android.content.Intent
+import android.speech.RecognizerIntent
+import java.util.Locale
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -67,6 +74,16 @@ private fun AethraTheme(content: @Composable () -> Unit) {
 }
 
 private data class ChatMessage(val text: String, val fromUser: Boolean)
+private data class MediaAttachment(val uri: Uri, val name: String, val mimeType: String?)
+
+private fun describeAttachment(context: Context, uri: Uri): MediaAttachment {
+    val mime = context.contentResolver.getType(uri)
+    val name = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+        ?.use { cursor ->
+            if (cursor.moveToFirst()) cursor.getString(0) else null
+        } ?: "Selected file"
+    return MediaAttachment(uri, name, mime)
+}
 
 /** Only expose models that are both integrated with a real chat runtime and fully present locally. */
 private fun availableChatModels(context: Context): List<ModelCandidate> {
@@ -130,6 +147,28 @@ private object ChatHistoryStore {
 private fun AethraChatScreen() {
     val context = LocalContext.current
     var prompt by remember { mutableStateOf("") }
+    var selectedAttachment by remember { mutableStateOf<MediaAttachment?>(null) }
+    var speechNotice by remember { mutableStateOf<String?>(null) }
+    val attachmentPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
+            selectedAttachment = describeAttachment(context, uri)
+            speechNotice = null
+        }
+    }
+    val speechInput = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        val spoken = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()
+        if (result.resultCode == android.app.Activity.RESULT_OK && !spoken.isNullOrBlank()) {
+            prompt = listOf(prompt, spoken).filter { it.isNotBlank() }.joinToString(" ")
+            speechNotice = "Voice input added to your prompt."
+        } else {
+            speechNotice = "Voice input was cancelled or unavailable."
+        }
+    }
     var selectedModel by remember { mutableStateOf(availableChatModels(context).firstOrNull()?.displayName ?: "No model installed") }
     var modelMenu by remember { mutableStateOf(false) }
     var infoDialog by remember { mutableStateOf(false) }
@@ -262,13 +301,34 @@ private fun AethraChatScreen() {
             Column(
                 Modifier.fillMaxWidth().background(Night).padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
+                selectedAttachment?.let { attachment ->
+                    Surface(
+                        color = Panel,
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 7.dp)
+                    ) {
+                        Row(
+                            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(attachment.name, color = Color.White, fontSize = 12.sp, maxLines = 1)
+                                Text(attachment.mimeType ?: "Unknown file type", color = Muted, fontSize = 10.sp)
+                            }
+                            TextButton(onClick = { selectedAttachment = null }) { Text("Remove") }
+                        }
+                    }
+                }
+                speechNotice?.let { notice ->
+                    Text(notice, color = Muted, fontSize = 10.sp, modifier = Modifier.padding(bottom = 5.dp))
+                }
                 Row(
                     Modifier.fillMaxWidth().background(Panel, RoundedCornerShape(24.dp))
                         .padding(horizontal = 6.dp, vertical = 5.dp),
                     verticalAlignment = Alignment.Bottom
                 ) {
-                    IconButton(onClick = { infoDialog = true }) {
-                        Icon(Icons.Default.AttachFile, contentDescription = "Attach file", tint = Muted)
+                    IconButton(onClick = { attachmentPicker.launch(arrayOf("*/*")) }) {
+                        Icon(Icons.Default.AttachFile, contentDescription = "Attach image, audio, video or document", tint = Muted)
                     }
                     TextField(
                         value = prompt,
@@ -284,13 +344,25 @@ private fun AethraChatScreen() {
                             cursorColor = Violet
                         )
                     )
-                    IconButton(onClick = { infoDialog = true }) {
-                        Icon(Icons.Default.Mic, contentDescription = "Voice", tint = Muted)
+                    IconButton(onClick = {
+                        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                            putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
+                            putExtra(RecognizerIntent.EXTRA_PROMPT, "Speak to AETHRA")
+                        }
+                        runCatching { speechInput.launch(intent) }
+                            .onFailure { speechNotice = "Speech recognition is not available on this device." }
+                    }) {
+                        Icon(Icons.Default.Mic, contentDescription = "Voice input", tint = Muted)
                     }
                     IconButton(
                         onClick = {
                             if (generating) {
                                 jobState.value?.cancel()
+                            } else if (selectedAttachment != null) {
+                                val attachment = selectedAttachment!!
+                                messages.add(ChatMessage("Attachment selected: ${attachment.name} (${attachment.mimeType ?: "unknown type"}). The current Gemma adapter is text-only, so this file is not yet passed into model inference. Multimodal runtime integration is still in progress.", false))
+                                selectedAttachment = null
                             } else if (prompt.isNotBlank()) {
                                 val requestText = prompt.trim()
                                 messages.add(ChatMessage(requestText, true))
