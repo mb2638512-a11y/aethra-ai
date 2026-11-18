@@ -51,4 +51,25 @@ class ModelRuntimeRegistryTest {
         val catalogueIds = ModelCatalogue.candidates.map { it.id }.toSet()
         assertEquals(catalogueIds, ModelRuntimeRegistry.allCapabilityModelIds())
     }
+
+    @Test
+    fun lfm3AndMiniCpmHaveBothModelAndProjectorDownloadAssets() {
+        val lfmAssets = ModelAssets.byModel["lfm3-omni-2b"].orEmpty()
+        assertEquals(2, lfmAssets.size)
+        assertTrue(lfmAssets.any { it.fileName == "LFM3-Omni-2B-Q4_K_M.gguf" })
+        assertTrue(lfmAssets.any { it.fileName == "mmproj-LFM3-Omni-2B-Q4_K_M.gguf" })
+
+        val miniAssets = ModelAssets.byModel["minicpm-v-4-6"].orEmpty()
+        assertEquals(2, miniAssets.size)
+        assertTrue(miniAssets.any { it.fileName == "MiniCPM-V-4_6-Q4_K_M.gguf" })
+        assertTrue(miniAssets.any { it.fileName == "mmproj-model-f16.gguf" })
+    }
+
+    @Test
+    fun onlyCatalogModelsWithManifestsCanBeDownloaded() {
+        assertTrue(ModelAssets.byModel.keys.all { modelId ->
+            ModelCatalogue.candidates.any { it.id == modelId }
+        })
+        assertTrue(ModelAssets.byModel.values.all { assets -> assets.isNotEmpty() && assets.all { it.url.startsWith("https://huggingface.co/") } })
+    }
 }
