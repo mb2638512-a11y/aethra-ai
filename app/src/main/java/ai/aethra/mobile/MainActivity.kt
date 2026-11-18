@@ -67,6 +67,26 @@ private fun AethraTheme(content: @Composable () -> Unit) {
 
 private data class ChatMessage(val text: String, val fromUser: Boolean)
 
+/** Only expose models that are both integrated with a real chat runtime and fully present locally. */
+private fun availableChatModels(context: Context): List<ModelCandidate> {
+    val integratedModelIds = setOf("gemma-4-e2b")
+    val modelDirectory = File(context.getExternalFilesDir(null), "models")
+    return ModelCatalogue.candidates.filter { candidate ->
+        if (candidate.id !in integratedModelIds) return@filter false
+        val assets = ModelAssets.byModel[candidate.id].orEmpty()
+        assets.isNotEmpty() && assets.all { asset ->
+            File(modelDirectory, asset.fileName).let { it.isFile && it.length() > 0L }
+        }
+    }
+}
+
+private fun modelMonogram(modelId: String): String = when (modelId) {
+    "gemma-4-e2b" -> "G"
+    "lfm3-omni-2b" -> "L"
+    "minicpm-v-4-6" -> "M"
+    else -> "AI"
+}
+
 private object ChatHistoryStore {
     private const val PREFS = "aethra_local_chat"
     private const val KEY_MESSAGES = "messages"
@@ -104,7 +124,7 @@ private object ChatHistoryStore {
 private fun AethraChatScreen() {
     val context = LocalContext.current
     var prompt by remember { mutableStateOf("") }
-    var selectedModel by remember { mutableStateOf("Select model") }
+    var selectedModel by remember { mutableStateOf(availableChatModels(context).firstOrNull()?.displayName ?: "No model installed") }
     var modelMenu by remember { mutableStateOf(false) }
     var infoDialog by remember { mutableStateOf(false) }
     var showModelLibrary by remember { mutableStateOf(false) }
@@ -149,8 +169,23 @@ private fun AethraChatScreen() {
                             Text(selectedModel, color = Violet, fontSize = 11.sp)
                         }
                         DropdownMenu(expanded = modelMenu, onDismissRequest = { modelMenu = false }) {
-                            ModelCatalogue.candidates.forEach { candidate ->
+                            val selectableModels = availableChatModels(context)
+                            if (selectableModels.isEmpty()) {
                                 DropdownMenuItem(
+                                    text = { Text("No downloaded, supported models") },
+                                    enabled = false,
+                                    onClick = {}
+                                )
+                            }
+                            selectableModels.forEach { candidate ->
+                                DropdownMenuItem(
+                                    leadingIcon = {
+                                        Surface(color = Violet.copy(alpha = 0.18f), shape = CircleShape) {
+                                            Box(Modifier.size(30.dp), contentAlignment = Alignment.Center) {
+                                                Text(modelMonogram(candidate.id), color = Violet, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    },
                                     text = { Text(candidate.displayName) },
                                     onClick = { selectedModel = candidate.displayName; modelMenu = false }
                                 )
