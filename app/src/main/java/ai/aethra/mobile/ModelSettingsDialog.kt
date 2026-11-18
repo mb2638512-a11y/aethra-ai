@@ -27,6 +27,7 @@ fun ModelSettingsDialog(onDismiss: () -> Unit) {
     val videoFrames = remember { mutableIntStateOf(MediaProcessingPreferences.maxVideoFrames(context)) }
     val pdfPages = remember { mutableIntStateOf(MediaProcessingPreferences.maxPdfPages(context)) }
     val imageDimension = remember { mutableIntStateOf(MediaProcessingPreferences.maxImageDimension(context)) }
+    val videoAudioSeconds = remember { mutableIntStateOf(MediaProcessingPreferences.maxVideoAudioSeconds(context)) }
     val device = remember { ModelExecutionPolicy.inspect(context) }
     val effective = minOf(selected.intValue, device.safeConcurrentLimit, 1)
 
@@ -54,6 +55,8 @@ fun ModelSettingsDialog(onDismiss: () -> Unit) {
                 Text("Media processing limits", style = MaterialTheme.typography.titleSmall)
                 Text("Video frames per request: ${videoFrames.intValue}")
                 Slider(value = videoFrames.intValue.toFloat(), onValueChange = { videoFrames.intValue = it.toInt().coerceIn(1, 4) }, valueRange = 1f..4f, steps = 2)
+                Text("Video audio segment: ${videoAudioSeconds.intValue} seconds")
+                Slider(value = videoAudioSeconds.intValue.toFloat(), onValueChange = { videoAudioSeconds.intValue = it.toInt().coerceIn(15, 180) }, valueRange = 15f..180f, steps = 10)
                 Text("PDF pages per request: ${pdfPages.intValue}")
                 Slider(value = pdfPages.intValue.toFloat(), onValueChange = { pdfPages.intValue = it.toInt().coerceIn(1, 4) }, valueRange = 1f..4f, steps = 2)
                 Text("Maximum image dimension: ${imageDimension.intValue}px")
@@ -72,7 +75,7 @@ fun ModelSettingsDialog(onDismiss: () -> Unit) {
         confirmButton = {
             TextButton(onClick = {
                 ModelExecutionPolicy.saveRequestedMaxModels(context, selected.intValue)
-                MediaProcessingPreferences.save(context, videoFrames.intValue, pdfPages.intValue, imageDimension.intValue)
+                MediaProcessingPreferences.save(context, videoFrames.intValue, pdfPages.intValue, imageDimension.intValue, videoAudioSeconds.intValue)
                 onDismiss()
             }) { Text("Save") }
         },
