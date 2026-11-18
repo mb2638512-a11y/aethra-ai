@@ -5,6 +5,9 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
 import android.media.MediaMetadataRetriever
+import android.media.MediaExtractor
+import android.media.MediaFormat
+import android.media.MediaMuxer
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import com.google.ai.edge.litertlm.Content
@@ -62,10 +65,20 @@ object MediaInputProcessor {
                     val frames = extractVideoFrames(context, uri, maxVideoFrames)
                     check(frames.isNotEmpty()) { "Could not decode frames from this video." }
                     files += frames
+                    val audioTrack = extractVideoAudio(context, uri)
+                    if (audioTrack != null) files += audioTrack
                     contents.clear()
-                    contents += Content.Text((if (prompt.isBlank()) "Summarize this video using the sampled frames." else prompt) + " Video input is represented by up to $maxVideoFrames sampled frames; the audio track is not included yet.")
+                    contents += Content.Text(
+                        (if (prompt.isBlank()) "Summarize this video using its sampled frames" else prompt) +
+                            if (audioTrack != null) ". A separate audio track from the first 60 seconds is also attached." else ". Video soundtrack could not be extracted; analyze the sampled frames only."
+                    )
                     frames.forEach { contents += Content.ImageFile(it.absolutePath) }
-                    note = "Video sampled into ${frames.size} image frames. Video audio-track analysis is not included yet."
+                    if (audioTrack != null) contents += Content.AudioFile(audioTrack.absolutePath)
+                    note = if (audioTrack != null) {
+                        "Video sampled into ${frames.size} image frames; audio from up to the first 60 seconds is attached separately."
+                    } else {
+                        "Video sampled into ${frames.size} image frames. No usable audio track was extracted."
+                    }
                 }
                 mimeType == "application/pdf" -> {
                     val pages = renderPdfPages(context, uri, maxPdfPages)
@@ -159,6 +172,61 @@ object MediaInputProcessor {
             retriever.release()
         }
         return output
+    }
+
+    /**
+     * Extracts a bounded audio segment from a video container into an M4A file.
+     * Compressed samples are remuxed without decoding/re-encoding.
+     */
+    private fun extractVideoAudio(context: Context, uri: Uri): File? {
+        val extractor = MediaExtractor()
+        var output: File? = null
+        var muxer: MediaMuxer? = null
+        return try {
+            extractor.setDataSource(context, uri, null)
+            val audioTrackIndex = (0 until extractor.trackCount).firstOrNull { index ->
+                extractor.getTrackFormat(index).getString(MediaFormat.KEY_MIME)?.startsWith("audio/") == true
+            } ?: return null
+            val format = extractor.getTrackFormat(audioTrackIndex)
+            extractor.selectTrack(audioTrackIndex)
+            val file = File.createTempFile("aethra_video_audio_", ".m4a", context.cacheDir)
+            output = file
+            val writer = MediaMuxer(file.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            muxer = writer
+            val muxerTrack = writer.addTrack(format)
+            writer.start()
+            val capacity = maxOf(
+                1 shl 20,
+                if (format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) else 0
+            )
+            val buffer = java.nio.ByteBuffer.allocateDirect(capacity)
+            val info = MediaMuxer.BufferInfo()
+            val maxDurationUs = 60_000_000L
+            while (true) {
+                buffer.clear()
+                val size = extractor.readSampleData(buffer, 0)
+                if (size < 0) break
+                val timestamp = extractor.sampleTime
+                if (timestamp < 0L || timestamp > maxDurationUs) break
+                info.set(0, size, timestamp, extractor.sampleFlags)
+                writer.writeSampleData(muxerTrack, buffer, info)
+                if (!extractor.advance()) break
+            }
+            writer.stop()
+            writer.release()
+            muxer = null
+            if (file.length() > 0L) file else {
+                file.delete()
+                null
+            }
+        } catch (_: Throwable) {
+            output?.delete()
+            null
+        } finally {
+            try { muxer?.stop() } catch (_: Throwable) { }
+            try { muxer?.release() } catch (_: Throwable) { }
+            extractor.release()
+        }
     }
 
     private fun renderPdfPages(context: Context, uri: Uri, maxPages: Int): List<File> {
