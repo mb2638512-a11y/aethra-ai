@@ -15,14 +15,14 @@ A local-first native Android AI workspace. The goal is to combine private on-dev
 - Model catalogue search and category filtering, with explicit input/output modality labels.
 - System speech recognition as voice-to-text input.
 - Android system TextToSpeech playback for assistant text responses.
-- Generic document/image/audio/video attachment picker with file name and MIME preview.
+- Media input pipeline for images, audio files, video frame sampling, PDF page rendering and plain-text documents, routed into LiteRT-LM multimodal contents for Gemma 4 E2B.
 - Functional workspace menu for Model Library, runtime settings and chat reset.
 - Multimodal runtime architecture and delivery plan.
 - GitHub Actions Android debug build workflow.
 
 ## Important runtime boundaries
 
-A file attachment picker is not the same as model inference. The current Gemma chat adapter accepts text only. Image, audio, video and document attachments are currently selected and previewed, but are not yet passed into model inference.
+Gemma 4 E2B uses LiteRT-LM vision and audio inputs. The app now stages image/audio files, samples up to four frames from video, renders up to four PDF pages, and reads plain-text documents before sending supported content to the model. Video is represented as sampled frames only; its audio track is not included yet. Physical-device validation is still required.
 
 The model catalogue describes each model's expected input/output modalities. A catalogue entry or downloaded weight file does not mean that an Android runtime is integrated. At present, Gemma 4 E2B is the only model registered as runnable in the Android app. LFM3-Omni-2B and MiniCPM-V 4.6 still need the native llama.cpp Android integration and multimodal projector support. The image, audio and video generation workflows need their own dedicated runtimes and component dependencies.
 
@@ -30,7 +30,7 @@ Android system TextToSpeech and speech recognition are device services, not a lo
 
 ## Remaining end-to-end work
 
-- Native llama.cpp Android build and JNI bridge, including multimodal libmtmd support.
+- Native llama.cpp Android build and JNI bridge, including multimodal libmtmd support for LFM3-Omni and MiniCPM-V.
 - Actual LFM3-Omni-2B text/image/audio/video inference and MiniCPM-V vision inference.
 - Media preprocessing: image scaling, audio decoding/transcription, video frame/audio sampling, PDF text extraction and document chunking.
 - Dedicated image-generation/editing, audio-generation/TTS model adapters, and video-generation pipelines.
