@@ -25,8 +25,6 @@ data class PreparedMediaInput(
 
 /** Converts Android content URIs into LiteRT-LM-supported file inputs. */
 object MediaInputProcessor {
-    private const val MAX_VIDEO_FRAMES = 4
-    private const val MAX_PDF_PAGES = 4
     private const val MAX_TEXT_CHARS = 100_000
 
     suspend fun prepare(
@@ -36,6 +34,9 @@ object MediaInputProcessor {
         prompt: String,
     ): PreparedMediaInput = withContext(Dispatchers.IO) {
         val resolver = context.contentResolver
+        val maxVideoFrames = MediaProcessingPreferences.maxVideoFrames(context)
+        val maxPdfPages = MediaProcessingPreferences.maxPdfPages(context)
+        val maxImageDimension = MediaProcessingPreferences.maxImageDimension(context)
         val files = mutableListOf<File>()
         val contents = mutableListOf<Content>()
         if (prompt.isNotBlank()) contents += Content.Text(prompt)
@@ -44,7 +45,7 @@ object MediaInputProcessor {
         when {
             mimeType?.startsWith("image/") == true -> {
                 if (prompt.isBlank()) contents += Content.Text("Describe this image in detail.")
-                val file = stageImage(context, uri)
+                val file = stageImage(context, uri, maxImageDimension)
                 files += file
                 contents += Content.ImageFile(file.absolutePath)
                 note = "Image attached for visual analysis."
@@ -57,21 +58,21 @@ object MediaInputProcessor {
                 note = "Audio attached for model audio understanding."
             }
             mimeType?.startsWith("video/") == true -> {
-                val frames = extractVideoFrames(context, uri)
+                val frames = extractVideoFrames(context, uri, maxVideoFrames)
                 check(frames.isNotEmpty()) { "Could not decode frames from this video." }
                 files += frames
                 frames.forEach { contents += Content.ImageFile(it.absolutePath) }
                 contents.clear()
-                contents += Content.Text((if (prompt.isBlank()) "Summarize this video using the sampled frames." else prompt) + " Video input is represented by up to $MAX_VIDEO_FRAMES sampled frames; the audio track is not included yet.")
+                contents += Content.Text((if (prompt.isBlank()) "Summarize this video using the sampled frames." else prompt) + " Video input is represented by up to $maxVideoFrames sampled frames; the audio track is not included yet.")
                 note = "Video sampled into ${frames.size} image frames. Video audio-track analysis is not included yet."
             }
             mimeType == "application/pdf" -> {
-                val pages = renderPdfPages(context, uri)
+                val pages = renderPdfPages(context, uri, maxPdfPages)
                 check(pages.isNotEmpty()) { "Could not render pages from this PDF." }
                 files += pages
                 pages.forEach { contents += Content.ImageFile(it.absolutePath) }
                 contents.clear()
-                contents += Content.Text((if (prompt.isBlank()) "Analyze this PDF." else prompt) + " PDF input is represented by up to $MAX_PDF_PAGES rendered pages.")
+                contents += Content.Text((if (prompt.isBlank()) "Analyze this PDF." else prompt) + " PDF input is represented by up to $maxPdfPages rendered pages.")
                 note = "PDF rendered into ${pages.size} page images for visual analysis."
             }
             mimeType?.startsWith("text/") == true -> {
@@ -86,16 +87,16 @@ object MediaInputProcessor {
         PreparedMediaInput(Contents.of(*contents.toTypedArray()), files, note)
     }
 
-    private fun stageImage(context: Context, uri: Uri): File {
+    private fun stageImage(context: Context, uri: Uri, maxDimension: Int): File {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
             ?: error("Could not inspect selected image.")
         var sample = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1600) sample *= 2
+        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > maxDimension) sample *= 2
         val options = BitmapFactory.Options().apply { inSampleSize = sample }
         val decoded = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
             ?: error("Could not decode selected image.")
-        val scale = minOf(1f, 1600f / maxOf(decoded.width, decoded.height).toFloat())
+        val scale = minOf(1f, maxDimension.toFloat() / maxOf(decoded.width, decoded.height).toFloat())
         val resized = if (scale < 1f) Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true) else decoded
         val file = File.createTempFile("aethra_image_", ".jpg", context.cacheDir)
         FileOutputStream(file).use { output ->
@@ -115,13 +116,13 @@ object MediaInputProcessor {
         return output
     }
 
-    private fun extractVideoFrames(context: Context, uri: Uri): List<File> {
+    private fun extractVideoFrames(context: Context, uri: Uri, maxFrames: Int): List<File> {
         val retriever = MediaMetadataRetriever()
         val output = mutableListOf<File>()
         try {
             retriever.setDataSource(context, uri)
             val durationMs = retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
-            val frameCount = minOf(MAX_VIDEO_FRAMES, maxOf(1, (durationMs / 3000L).toInt() + 1))
+            val frameCount = minOf(maxFrames, maxOf(1, (durationMs / 3000L).toInt() + 1))
             for (index in 0 until frameCount) {
                 val fraction = if (frameCount == 1) 0.5 else index.toDouble() / (frameCount - 1)
                 val timeUs = (durationMs * 1000.0 * fraction).toLong()
@@ -137,13 +138,13 @@ object MediaInputProcessor {
         return output
     }
 
-    private fun renderPdfPages(context: Context, uri: Uri): List<File> {
+    private fun renderPdfPages(context: Context, uri: Uri, maxPages: Int): List<File> {
         val descriptor: ParcelFileDescriptor = context.contentResolver.openFileDescriptor(uri, "r")
             ?: error("Could not open this PDF.")
         val output = mutableListOf<File>()
         descriptor.use { fd ->
             PdfRenderer(fd).use { renderer ->
-                val pageCount = minOf(renderer.pageCount, MAX_PDF_PAGES)
+                val pageCount = minOf(renderer.pageCount, maxPages)
                 for (index in 0 until pageCount) {
                     renderer.openPage(index).use { page ->
                         val scale = minOf(1.0, 1400.0 / maxOf(page.width, page.height))
