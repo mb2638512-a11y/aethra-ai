@@ -305,7 +305,7 @@ private fun AethraChatScreen() {
                                                 false
                                             )
                                         } else {
-                                            val modelFile = File(context.getExternalFilesDir(null), "models/gemma-4-E2B-it.litertlm")
+                                            val modelFile = modelFileFor(context, candidate) ?: error("No model artifact manifest is available.")
                                             if (!modelFile.exists()) {
                                                 messages[responseIndex] = ChatMessage(
                                                     "Gemma 4 E2B is not downloaded yet. Open Model Library and download it first.",
