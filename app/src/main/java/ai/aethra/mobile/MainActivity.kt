@@ -241,7 +241,9 @@ private fun AethraChatScreen() {
             speechNotice = "Voice input was cancelled or unavailable."
         }
     }
-    var selectedModel by remember { mutableStateOf(availableChatModels(context).firstOrNull()?.displayName ?: "No model installed") }
+    var selectedModel by remember { mutableStateOf("No model running") }
+    var nativeRuntimeDiagnostic by remember { mutableStateOf<String?>(null) }
+    var nativeRuntimeChecking by remember { mutableStateOf(false) }
     var modelMenu by remember { mutableStateOf(false) }
     var infoDialog by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
@@ -291,7 +293,7 @@ private fun AethraChatScreen() {
                     check(actualHash.equals(expectedHash, ignoreCase = true)) { "Gemma model checksum mismatch. Delete and download it again." }
                 }
                 LiteRtModelSession(modelFile.absolutePath).also { it.open() }
-            }.onSuccess { sessionState.value = it }
+            }.onSuccess { sessionState.value = it; selectedModel = defaultModel.displayName }
         }
     }
 
@@ -682,7 +684,27 @@ private fun AethraChatScreen() {
                     TextButton(onClick = { showModelLibrary = true; infoDialog = false }) { Text("Model Library & Downloads") }
                     TextButton(onClick = { showSettings = true; infoDialog = false }) { Text("Runtime & Device Settings") }
                     TextButton(onClick = { messages.clear(); ChatHistoryStore.clear(context); infoDialog = false }) { Text("New Chat / Clear History") }
-                    Text("Input: text, images, audio normalized to mono 16 kHz WAV, PDF pages and sampled video frames plus separately extracted audio through Gemma 4 E2B. Output: model text plus Android text-to-speech. LFM3-Omni and MiniCPM-V downloads are available, but their Android inference adapters are still pending.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                    Text("Input: text, images, audio normalized to mono 16 kHz WAV, PDF pages and sampled video frames plus separately extracted audio through Gemma 4 E2B. Output: model text plus Android text-to-speech. LFM3-Omni and MiniCPM-V GGUF/JNI runtime is packaged in this build but is not exposed as runnable until device and model/projector validation passes.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                    TextButton(
+                        enabled = !nativeRuntimeChecking,
+                        onClick = {
+                            nativeRuntimeChecking = true
+                            nativeRuntimeDiagnostic = "Checking native library and JNI bridge…"
+                            scope.launch {
+                                val result = withContext(Dispatchers.IO) {
+                                    runCatching { NativeGgufRuntime.nativeSystemInfo() }
+                                }
+                                nativeRuntimeDiagnostic = result.fold(
+                                    onSuccess = { "JNI bridge loaded successfully. Native backend: $it" },
+                                    onFailure = { "Native runtime self-check failed: ${it.message ?: it.javaClass.simpleName}" }
+                                )
+                                nativeRuntimeChecking = false
+                            }
+                        }
+                    ) { Text(if (nativeRuntimeChecking) "Checking…" else "Run native runtime self-check") }
+                    nativeRuntimeDiagnostic?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = Muted)
+                    }
                 }
             },
             confirmButton = { TextButton(onClick = { infoDialog = false }) { Text("Close") } },
