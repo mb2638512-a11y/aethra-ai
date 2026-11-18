@@ -148,6 +148,19 @@ class ModelDownloadManager(context: Context) {
     fun modelDirectory(): File =
         File(appContext.getExternalFilesDir(null), "models").apply { mkdirs() }
 
+    fun deleteModelAssets(modelId: String): Int {
+        val assets = ModelAssets.byModel[modelId].orEmpty()
+        val ids = ModelDownloadStore.load(appContext, modelId)
+        cancel(*ids.toLongArray())
+        var deleted = 0
+        assets.forEach { asset ->
+            val file = File(modelDirectory(), asset.fileName)
+            if (file.exists() && file.delete()) deleted++
+        }
+        ModelDownloadStore.clear(appContext, modelId)
+        return deleted
+    }
+
     fun sha256(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
         FileInputStream(file).use { input ->
