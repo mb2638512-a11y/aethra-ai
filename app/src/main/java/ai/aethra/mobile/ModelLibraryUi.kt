@@ -179,7 +179,10 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
                                             val device = ModelExecutionPolicy.inspect(context)
                                             check(device.freeStorageGb >= 3.0) { "At least 3 GB free storage is required for this download." }
                                             val failedIds = modelSnapshots.filter { it.status == DownloadManager.STATUS_FAILED }.map { it.id }
-                                            val failedFiles = failedIds.mapNotNull { ModelDownloadStore.assetName(context, it) }.toSet()
+                                            val mappedFailedFiles = failedIds.mapNotNull { ModelDownloadStore.assetName(context, it) }.toSet()
+                                            val failedFiles = if (failedIds.isNotEmpty() && mappedFailedFiles.isEmpty()) {
+                                                assets.map { it.fileName }.toSet()
+                                            } else mappedFailedFiles
                                             if (failedIds.isNotEmpty()) downloader.cancel(*failedIds.toLongArray())
                                             downloader.enqueueMissingModel(model.id, failedFiles)
                                         }.onSuccess { newIds ->
