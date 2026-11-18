@@ -61,7 +61,8 @@ object MediaInputProcessor {
                 check(frames.isNotEmpty()) { "Could not decode frames from this video." }
                 files += frames
                 frames.forEach { contents += Content.ImageFile(it.absolutePath) }
-                contents.add(0, Content.Text((if (prompt.isBlank()) "Summarize this video using the sampled frames." else prompt) + " Video input is represented by up to $MAX_VIDEO_FRAMES sampled frames; the audio track is not included yet."))
+                contents.clear()
+                contents += Content.Text((if (prompt.isBlank()) "Summarize this video using the sampled frames." else prompt) + " Video input is represented by up to $MAX_VIDEO_FRAMES sampled frames; the audio track is not included yet.")
                 note = "Video sampled into ${frames.size} image frames. Video audio-track analysis is not included yet."
             }
             mimeType == "application/pdf" -> {
@@ -69,7 +70,8 @@ object MediaInputProcessor {
                 check(pages.isNotEmpty()) { "Could not render pages from this PDF." }
                 files += pages
                 pages.forEach { contents += Content.ImageFile(it.absolutePath) }
-                contents.add(0, Content.Text((if (prompt.isBlank()) "Analyze this PDF." else prompt) + " PDF input is represented by up to $MAX_PDF_PAGES rendered pages."))
+                contents.clear()
+                contents += Content.Text((if (prompt.isBlank()) "Analyze this PDF." else prompt) + " PDF input is represented by up to $MAX_PDF_PAGES rendered pages.")
                 note = "PDF rendered into ${pages.size} page images for visual analysis."
             }
             mimeType?.startsWith("text/") == true -> {
