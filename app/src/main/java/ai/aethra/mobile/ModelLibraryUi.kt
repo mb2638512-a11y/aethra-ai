@@ -116,8 +116,8 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
                         val file = java.io.File(downloader.modelDirectory(), asset.fileName)
                         file.isFile && file.length() > 0L
                     }
-                    val allDone = filesPresent
                     val hasFailed = modelSnapshots.any { it.status == DownloadManager.STATUS_FAILED }
+                    val allDone = ModelDownloadReadiness.isReady(filesPresent, ids.size, modelSnapshots)
                     val hasActive = modelSnapshots.any {
                         it.status == DownloadManager.STATUS_PENDING ||
                             it.status == DownloadManager.STATUS_RUNNING ||
@@ -169,7 +169,7 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
                                 }
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                if (ModelRuntimeRegistry.isRunnableOnAndroid(model.id) && filesPresent) {
+                                if (ModelRuntimeRegistry.isRunnableOnAndroid(model.id) && allDone) {
                                     OutlinedButton(onClick = { onRunModel(model); onDismiss() }) { Text("Run") }
                                 }
                                 Button(
