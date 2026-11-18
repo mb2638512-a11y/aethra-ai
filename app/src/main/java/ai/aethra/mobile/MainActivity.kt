@@ -88,7 +88,7 @@ private fun describeAttachment(context: Context, uri: Uri): MediaAttachment {
 
 /** Only expose models that are both integrated with a real chat runtime and fully present locally. */
 private fun availableChatModels(context: Context): List<ModelCandidate> {
-    val integratedModelIds = setOf("gemma-4-e2b")
+    val integratedModelIds = ModelRuntimeRegistry.runnableModelIds()
     val modelDirectory = File(context.getExternalFilesDir(null), "models")
     return ModelCatalogue.candidates.filter { candidate ->
         if (candidate.id !in integratedModelIds) return@filter false
