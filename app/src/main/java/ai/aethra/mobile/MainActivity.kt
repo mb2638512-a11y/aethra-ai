@@ -520,7 +520,32 @@ private fun AethraChatScreen() {
     }
 
     if (showModelLibrary) {
-        ModelLibraryDialog(onDismiss = { showModelLibrary = false })
+        ModelLibraryDialog(
+            onDismiss = { showModelLibrary = false },
+            onRunModel = { candidate ->
+                jobState.value?.cancel()
+                selectedModel = "No model running"
+                scope.launch {
+                    sessionState.value?.close()
+                    sessionState.value = null
+                    try {
+                        ModelExecutionPolicy.assertCanLoad(context, candidate.minimumRamGb ?: 6, 0.25)
+                        val modelFile = modelFileFor(context, candidate) ?: error("No model artifact manifest is available.")
+                        val expectedHash = ModelAssets.byModel[candidate.id]?.firstOrNull()?.expectedSha256
+                        if (expectedHash != null) {
+                            val actualHash = withContext(Dispatchers.IO) { ModelDownloadManager(context).sha256(modelFile) }
+                            check(actualHash.equals(expectedHash, ignoreCase = true)) { "Model checksum mismatch." }
+                        }
+                        val session = LiteRtModelSession(modelFile.absolutePath)
+                        session.open()
+                        sessionState.value = session
+                        selectedModel = candidate.displayName
+                    } catch (error: Throwable) {
+                        messages.add(ChatMessage("Model not started: ${error.message ?: "device check failed"}", false))
+                    }
+                }
+            }
+        )
     }
 
     if (showSettings) {
