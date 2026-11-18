@@ -207,8 +207,9 @@ private fun AethraChatScreen() {
                                     },
                                     text = { Text(candidate.displayName) },
                                     onClick = {
-                                        selectedModel = candidate.displayName
                                         modelMenu = false
+                                        jobState.value?.cancel()
+                                        selectedModel = "No model running"
                                         scope.launch {
                                             sessionState.value?.close()
                                             sessionState.value = null
@@ -223,6 +224,7 @@ private fun AethraChatScreen() {
                                                 val session = LiteRtModelSession(modelFile.absolutePath)
                                                 session.open()
                                                 sessionState.value = session
+                                                selectedModel = candidate.displayName
                                             } catch (error: Throwable) {
                                                 messages.add(ChatMessage("Model not started: ${error.message ?: "device check failed"}", false))
                                             }
