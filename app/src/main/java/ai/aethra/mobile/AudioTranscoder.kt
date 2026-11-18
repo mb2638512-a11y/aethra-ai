@@ -77,12 +77,8 @@ object AudioTranscoder {
                                 inputEnded = true
                             } else {
                                 codec.queueInputBuffer(inputIndex, 0, sampleSize, timestamp, extractor.sampleFlags)
-                                if (!extractor.advance()) {
-                                    // The next input request sends EOS.
-                                    inputEnded = false
-                                    extractor.selectTrack(trackIndex)
-                                    // A sentinel is not needed: readSampleData() returns -1 at end.
-                                }
+                                // At end of track, the next readSampleData() returns -1 and queues EOS.
+                                extractor.advance()
                             }
                         }
                     }
@@ -155,7 +151,7 @@ object AudioTranscoder {
                 while (outputIndex < outputSamples) {
                     val sourceIndex = (outputIndex * sourceRate / TARGET_SAMPLE_RATE).coerceAtMost(sourceSamples - 1L)
                     source.seek(sourceIndex * 2L)
-                    val sample = Short.reverseBytes(source.readShort()).toInt()
+                    val sample = java.lang.Short.reverseBytes(source.readShort()).toInt()
                     val normalized = (sample / 32768.0f).coerceIn(-1.0f, 1.0f)
                     val bits = java.lang.Float.floatToIntBits(normalized)
                     output.write(bits and 0xff)
