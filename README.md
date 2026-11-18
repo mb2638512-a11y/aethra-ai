@@ -11,6 +11,7 @@ A local-first native Android AI workspace. The goal is to combine private on-dev
 - Gemma 4 E2B LiteRT-LM session adapter with streamed text generation and cancellation.
 - Android DownloadManager-based model downloads for Gemma 4 E2B, LFM3-Omni-2B (GGUF + projector) and MiniCPM-V 4.6 (GGUF + projector).
 - Device readiness checks for RAM, free storage, low-memory state and thermal status.
+- User-configurable media preprocessing limits: 1–4 video frames, 1–4 PDF pages and 768–2048 px maximum image dimension.
 - Single-active-model policy; Run selector is gated by the Android runtime registry and locally available model assets.
 - Model catalogue search and category filtering, with explicit input/output modality labels.
 - System speech recognition as voice-to-text input.
