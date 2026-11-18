@@ -1,6 +1,6 @@
 package ai.aethra.mobile
 
-/** RIFF/WAVE header for mono, signed 16-bit little-endian PCM at 16 kHz. */
+/** RIFF/WAVE header for mono IEEE float32 little-endian PCM at 16 kHz. */
 object PcmWavFormat {
     const val SAMPLE_RATE = 16_000
     const val CHANNELS = 1
