@@ -47,11 +47,15 @@ std::string from_java(JNIEnv * env, jstring value) {
     result.reserve(static_cast<size_t>(length) * 3);
     for (jsize index = 0; index < length; ++index) {
         uint32_t codepoint = chars[index];
-        if (codepoint >= 0xD800 && codepoint <= 0xDBFF && index + 1 < length) {
-            const uint32_t low = chars[index + 1];
-            if (low >= 0xDC00 && low <= 0xDFFF) {
-                codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low - 0xDC00);
-                ++index;
+        if (codepoint >= 0xD800 && codepoint <= 0xDBFF) {
+            if (index + 1 < length) {
+                const uint32_t low = chars[index + 1];
+                if (low >= 0xDC00 && low <= 0xDFFF) {
+                    codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (low - 0xDC00);
+                    ++index;
+                } else {
+                    codepoint = 0xFFFD;
+                }
             } else {
                 codepoint = 0xFFFD;
             }
@@ -118,7 +122,9 @@ jstring to_java(JNIEnv * env, const std::string & value) {
             utf16.push_back(static_cast<jchar>(0xDC00 + (codepoint & 0x3FF)));
         }
     }
-    return env->NewString(utf16.data(), static_cast<jsize>(utf16.size()));
+    static const jchar empty = 0;
+    const jchar * data = utf16.empty() ? &empty : utf16.data();
+    return env->NewString(data, static_cast<jsize>(utf16.size()));
 }
 
 void unload_locked() {
