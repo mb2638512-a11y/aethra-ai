@@ -110,7 +110,7 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
                         val file = java.io.File(downloader.modelDirectory(), asset.fileName)
                         file.isFile && file.length() > 0L
                     }
-                    val allDone = filesPresent || (total > 0 && done == total)
+                    val allDone = filesPresent
                     val progress = if (modelSnapshots.isNotEmpty()) {
                         modelSnapshots.map { it.progressPercent }.average().toFloat() / 100f
                     } else 0f
