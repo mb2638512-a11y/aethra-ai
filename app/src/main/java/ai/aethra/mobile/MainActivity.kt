@@ -1,6 +1,9 @@
 package ai.aethra.mobile
 
 import android.os.Bundle
+import android.content.Context
+import org.json.JSONArray
+import org.json.JSONObject
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -20,6 +23,7 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -56,14 +60,53 @@ private fun AethraTheme(content: @Composable () -> Unit) {
 
 private data class ChatMessage(val text: String, val fromUser: Boolean)
 
+private object ChatHistoryStore {
+    private const val PREFS = "aethra_local_chat"
+    private const val KEY_MESSAGES = "messages"
+
+    fun load(context: Context): List<ChatMessage> = runCatching {
+        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getString(KEY_MESSAGES, "[]") ?: "[]"
+        val array = JSONArray(raw)
+        buildList {
+            for (index in 0 until array.length()) {
+                val item = array.getJSONObject(index)
+                add(ChatMessage(item.optString("text"), item.optBoolean("fromUser", true)))
+            }
+        }
+    }.getOrDefault(emptyList())
+
+    fun save(context: Context, messages: List<ChatMessage>) {
+        runCatching {
+            val array = JSONArray()
+            messages.forEach { message ->
+                array.put(JSONObject().put("text", message.text).put("fromUser", message.fromUser))
+            }
+            context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit().putString(KEY_MESSAGES, array.toString()).apply()
+        }
+    }
+
+    fun clear(context: Context) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY_MESSAGES).apply()
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun AethraChatScreen() {
+    val context = LocalContext.current
     var prompt by remember { mutableStateOf("") }
     var selectedModel by remember { mutableStateOf("Select model") }
     var modelMenu by remember { mutableStateOf(false) }
     var infoDialog by remember { mutableStateOf(false) }
-    val messages = remember { mutableStateListOf<ChatMessage>() }
+    val messages = remember {
+        mutableStateListOf<ChatMessage>().apply { addAll(ChatHistoryStore.load(context)) }
+    }
+
+    LaunchedEffect(messages.size) {
+        ChatHistoryStore.save(context, messages.toList())
+    }
 
     Scaffold(
         containerColor = Night,
@@ -94,7 +137,7 @@ private fun AethraChatScreen() {
                             }
                         }
                     }
-                    IconButton(onClick = { messages.clear() }) {
+                    IconButton(onClick = { messages.clear(); ChatHistoryStore.clear(context) }) {
                         Icon(Icons.Default.Add, contentDescription = "New chat", tint = Color.White)
                     }
                 },
