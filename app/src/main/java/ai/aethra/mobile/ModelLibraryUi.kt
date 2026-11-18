@@ -69,7 +69,11 @@ fun ModelLibraryDialog(onDismiss: () -> Unit) {
                     val modelSnapshots = ids.mapNotNull { snapshots[it] }
                     val done = modelSnapshots.count { it.status == DownloadManager.STATUS_SUCCESSFUL }
                     val total = assets.size
-                    val allDone = total > 0 && done == total
+                    val filesPresent = assets.isNotEmpty() && assets.all { asset ->
+                        val file = java.io.File(downloader.modelDirectory(), asset.fileName)
+                        file.isFile && file.length() > 0L
+                    }
+                    val allDone = filesPresent || (total > 0 && done == total)
                     val progress = if (modelSnapshots.isNotEmpty()) {
                         modelSnapshots.map { it.progressPercent }.average().toFloat() / 100f
                     } else 0f
@@ -86,6 +90,11 @@ fun ModelLibraryDialog(onDismiss: () -> Unit) {
                             Text(model.category.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             Text(model.purpose, style = MaterialTheme.typography.bodySmall)
                             Text("Runtime: ${model.runtime}", style = MaterialTheme.typography.bodySmall)
+                            Text(
+                                if (model.id == "gemma-4-e2b") "Android runtime integrated" else "Catalogue/download entry • Android runtime pending",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (model.id == "gemma-4-e2b") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                            )
                             Text("Package: ${model.approximateDownload}", style = MaterialTheme.typography.bodySmall)
                             Text(
                                 "RAM guidance: ${model.minimumRamGb?.let { "at least ${it} GB" } ?: "not independently specified"}",
@@ -105,7 +114,7 @@ fun ModelLibraryDialog(onDismiss: () -> Unit) {
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Button(
-                                    enabled = assets.isNotEmpty() && ids.isEmpty(),
+                                    enabled = assets.isNotEmpty() && ids.isEmpty() && !allDone,
                                     onClick = {
                                         runCatching {
                                             val device = ModelExecutionPolicy.inspect(context)
