@@ -14,7 +14,7 @@ A local-first native Android AI workspace. The goal is to combine private on-dev
 - User-configurable media preprocessing limits: 1–4 video frames, 1–4 PDF pages and 768–2048 px maximum image dimension.
 - Single-active-model policy; Run selector is gated by the Android runtime registry and locally available model assets.
 - Model catalogue search and category filtering, with explicit input/output modality labels.
-- System speech recognition as voice-to-text input.
+- System speech recognition as voice-to-text input, plus in-app microphone recording as an audio-file attachment (runtime permission requested on demand).
 - Android system TextToSpeech playback for assistant text responses.
 - Media input pipeline for gallery/camera images, audio files, video frame sampling, PDF page rendering and plain-text documents, routed into LiteRT-LM multimodal contents for Gemma 4 E2B.
 - Conversation transcript sharing through the Android Sharesheet.
