@@ -44,12 +44,14 @@ object MediaInputProcessor {
 
         when {
             mimeType?.startsWith("image/") == true -> {
+                if (prompt.isBlank()) contents += Content.Text("Describe this image in detail.")
                 val file = copyToCache(context, uri, extensionFor(mimeType))
                 files += file
                 contents += Content.ImageFile(file.absolutePath)
                 note = "Image attached for visual analysis."
             }
             mimeType?.startsWith("audio/") == true -> {
+                if (prompt.isBlank()) contents += Content.Text("Transcribe and summarize this audio.")
                 val file = copyToCache(context, uri, extensionFor(mimeType))
                 files += file
                 contents += Content.AudioFile(file.absolutePath)
