@@ -2,6 +2,8 @@ package ai.aethra.mobile
 
 import android.os.Bundle
 import android.graphics.Bitmap
+import android.media.MediaRecorder
+import android.Manifest
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.content.Intent
@@ -39,6 +41,7 @@ import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -154,6 +157,9 @@ private fun AethraChatScreen() {
     var prompt by remember { mutableStateOf("") }
     var selectedAttachment by remember { mutableStateOf<MediaAttachment?>(null) }
     var speechNotice by remember { mutableStateOf<String?>(null) }
+    var audioRecording by remember { mutableStateOf(false) }
+    var audioRecorder by remember { mutableStateOf<MediaRecorder?>(null) }
+    var audioRecordingFile by remember { mutableStateOf<File?>(null) }
     val attachmentPicker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri ->
@@ -162,6 +168,44 @@ private fun AethraChatScreen() {
             selectedAttachment = describeAttachment(context, uri)
             speechNotice = null
         }
+    }
+    @Suppress("DEPRECATION")
+    fun startAudioRecording() {
+        runCatching {
+            val file = File.createTempFile("aethra_audio_", ".m4a", context.cacheDir)
+            val recorder = MediaRecorder()
+            recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
+            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            recorder.setOutputFile(file.absolutePath)
+            recorder.prepare()
+            recorder.start()
+            audioRecorder = recorder
+            audioRecordingFile = file
+            audioRecording = true
+            speechNotice = "Recording audio… tap Stop to attach."
+        }.onFailure { speechNotice = it.message ?: "Audio recording could not start." }
+    }
+    fun stopAudioRecording() {
+        val recorder = audioRecorder
+        val file = audioRecordingFile
+        val stopped = runCatching { recorder?.stop() }.isSuccess
+        recorder?.release()
+        audioRecorder = null
+        audioRecordingFile = null
+        audioRecording = false
+        if (stopped && file != null && file.isFile && file.length() > 0L) {
+            selectedAttachment = MediaAttachment(Uri.fromFile(file), "Audio recording.m4a", "audio/mp4")
+            speechNotice = "Audio recording attached."
+        } else {
+            file?.delete()
+            speechNotice = "Recording was too short or could not be saved."
+        }
+    }
+    val audioPermission = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) startAudioRecording() else speechNotice = "Microphone permission was denied."
     }
     val cameraCapture = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicturePreview()
@@ -198,6 +242,8 @@ private fun AethraChatScreen() {
     val speechOutput = remember(context) { TextToSpeech(context) { } }
     DisposableEffect(speechOutput) {
         onDispose {
+            runCatching { audioRecorder?.stop() }
+            audioRecorder?.release()
             speechOutput.stop()
             speechOutput.shutdown()
         }
@@ -399,6 +445,16 @@ private fun AethraChatScreen() {
                     )
                     IconButton(onClick = { runCatching { cameraCapture.launch(null) }.onFailure { speechNotice = "Camera is not available." } }) {
                         Icon(Icons.Default.CameraAlt, contentDescription = "Capture image", tint = Muted)
+                    }
+                    IconButton(onClick = {
+                        if (audioRecording) stopAudioRecording()
+                        else audioPermission.launch(Manifest.permission.RECORD_AUDIO)
+                    }) {
+                        Icon(
+                            if (audioRecording) Icons.Default.Stop else Icons.Default.GraphicEq,
+                            contentDescription = if (audioRecording) "Stop recording" else "Record audio",
+                            tint = if (audioRecording) Color(0xFFFF6B6B) else Muted
+                        )
                     }
                     IconButton(onClick = {
                         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
