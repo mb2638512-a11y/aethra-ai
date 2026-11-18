@@ -76,6 +76,16 @@ object ModelAssets {
  * Uses Android's system DownloadManager so large model downloads can continue
  * outside the app process. Model files stay in the app-specific external folder.
  */
+object ModelDownloadReadiness {
+    /** Files on disk are not sufficient while DownloadManager may still be writing a partial artifact. */
+    fun isReady(filesPresent: Boolean, savedDownloadCount: Int, snapshots: List<DownloadSnapshot>): Boolean {
+        if (!filesPresent) return false
+        if (savedDownloadCount == 0) return true
+        return snapshots.size == savedDownloadCount &&
+            snapshots.all { it.status == DownloadManager.STATUS_SUCCESSFUL }
+    }
+}
+
 object ModelDownloadStore {
     private const val PREFS = "aethra_model_downloads"
     fun save(context: Context, modelId: String, ids: List<Long>) {
