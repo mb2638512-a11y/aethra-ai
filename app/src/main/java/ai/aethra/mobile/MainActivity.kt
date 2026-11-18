@@ -5,6 +5,8 @@ import java.io.File
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
@@ -223,6 +225,15 @@ private fun AethraChatScreen() {
                                                     false
                                                 )
                                             } else {
+                                                val expectedHash = ModelAssets.byModel["gemma-4-e2b"]?.firstOrNull()?.expectedSha256
+                                                if (expectedHash != null) {
+                                                    val actualHash = withContext(Dispatchers.IO) {
+                                                        ModelDownloadManager(context).sha256(modelFile)
+                                                    }
+                                                    check(actualHash.equals(expectedHash, ignoreCase = true)) {
+                                                        "Gemma model checksum mismatch. Delete the model and download it again."
+                                                    }
+                                                }
                                                 var session = sessionState.value
                                                 if (session == null) {
                                                     session = LiteRtModelSession(modelFile.absolutePath)
@@ -322,7 +333,7 @@ private fun AethraChatScreen() {
         AlertDialog(
             onDismissRequest = { infoDialog = false },
             title = { Text("AETHRA AI") },
-            text = { Text("The native Android UI foundation is being built. Model execution, downloads, file import and voice are not connected yet. The app will not pretend to generate AI answers until a real inference runtime is integrated.") },
+            text = { Text("AETHRA uses local model inference when a supported model is installed. Gemma 4 E2B is the first LiteRT-LM target. LFM3 and MiniCPM still need their Android inference runtime. Downloads are verified before Gemma is loaded.") },
             confirmButton = { TextButton(onClick = { infoDialog = false }) { Text("Understood") } },
             containerColor = Panel
         )
