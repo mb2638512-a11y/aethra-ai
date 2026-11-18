@@ -43,7 +43,8 @@ jobs:
 
       - name: Configure llama.cpp and libmtmd for Android
         run: |
-          cmake -S third_party/llama.cpp -B build/llama-android \
+          cmake -S native -B build/llama-android \
+            -DLLAMA_CPP_SOURCE_DIR="$GITHUB_WORKSPACE/third_party/llama.cpp" \
             -DCMAKE_BUILD_TYPE=Release \
             -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_HOME/build/cmake/android.toolchain.cmake" \
             -DANDROID_ABI=arm64-v8a \
@@ -63,12 +64,13 @@ jobs:
             -DBUILD_SHARED_LIBS=ON
 
       - name: Build llama and mtmd shared libraries
-        run: cmake --build build/llama-android --target llama mtmd --config Release --parallel 2
+        run: cmake --build build/llama-android --target aethra_llama_jni --config Release --parallel 2
 
       - name: Collect native libraries
         run: |
           mkdir -p artifacts/arm64-v8a
-          find build/llama-android -type f \( -name "libllama.so*" -o -name "libmtmd.so*" -o -name "libggml*.so*" \) -exec cp -v {} artifacts/arm64-v8a/ \;
+          find build/llama-android -type f \( -name "libaethra_llama_jni.so*" -o -name "libllama.so*" -o -name "libmtmd.so*" -o -name "libggml*.so*" \) -exec cp -v {} artifacts/arm64-v8a/ \;
+          test -f artifacts/arm64-v8a/libaethra_llama_jni.so
           test -f artifacts/arm64-v8a/libllama.so
           test -f artifacts/arm64-v8a/libmtmd.so
           printf "Pinned llama.cpp commit: " && git -C third_party/llama.cpp rev-parse HEAD
