@@ -4,6 +4,9 @@ import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Conversation
 import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
+import com.google.ai.edge.litertlm.ConversationConfig
+import com.google.ai.edge.litertlm.Contents
+import com.google.ai.edge.litertlm.SamplerConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
@@ -20,6 +23,7 @@ import java.io.Closeable
  */
 class LiteRtModelSession(
     private val modelPath: String,
+    private val systemInstruction: String = "You are AETHRA, a helpful, honest and precise AI assistant. If you are unsure, say so clearly.",
 ) : Closeable {
     @Volatile private var engine: Engine? = null
     @Volatile private var conversation: Conversation? = null
@@ -35,9 +39,14 @@ class LiteRtModelSession(
         try {
             created.initialize()
             engine = created
-            conversation = created.createConversation()
+            conversation = created.createConversation(
+                ConversationConfig(
+                    systemInstruction = Contents.of(systemInstruction),
+                    samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.7),
+                )
+            )
         } catch (error: Throwable) {
-            created.close()
+            if (created.isInitialized()) created.close()
             throw error
         }
     }
