@@ -17,6 +17,7 @@ class ModelRuntimeRegistryTest {
         assertEquals(64_000, littleEndianInt(header, 28))
         assertEquals(1, littleEndianShort(header, 22))
         assertEquals(3, littleEndianShort(header, 20))
+        assertEquals(4, littleEndianShort(header, 32))
         assertEquals(32, littleEndianShort(header, 34))
         assertEquals(32000, littleEndianInt(header, 40))
     }
