@@ -162,9 +162,17 @@ object MediaInputProcessor {
                 val timeUs = (durationMs * 1000.0 * fraction).toLong()
                 val bitmap = retriever.getFrameAtTime(timeUs, MediaMetadataRetriever.OPTION_CLOSEST_SYNC) ?: continue
                 val file = File.createTempFile("aethra_video_frame_", ".jpg", context.cacheDir)
-                FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 86, it) }
-                bitmap.recycle()
-                output += file
+                try {
+                    FileOutputStream(file).use {
+                        check(bitmap.compress(Bitmap.CompressFormat.JPEG, 86, it)) { "Could not encode video frame." }
+                    }
+                    output += file
+                } catch (error: Throwable) {
+                    file.delete()
+                    throw error
+                } finally {
+                    bitmap.recycle()
+                }
             }
         } catch (error: Throwable) {
             output.forEach { it.delete() }
@@ -247,8 +255,13 @@ object MediaInputProcessor {
                             try {
                                 page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
                                 val file = File.createTempFile("aethra_pdf_page_", ".jpg", context.cacheDir)
-                                FileOutputStream(file).use { check(bitmap.compress(Bitmap.CompressFormat.JPEG, 88, it)) }
-                                output += file
+                                try {
+                                    FileOutputStream(file).use { check(bitmap.compress(Bitmap.CompressFormat.JPEG, 88, it)) }
+                                    output += file
+                                } catch (error: Throwable) {
+                                    file.delete()
+                                    throw error
+                                }
                             } finally {
                                 bitmap.recycle()
                             }
