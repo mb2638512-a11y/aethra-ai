@@ -27,7 +27,7 @@ object MediaInputRouter {
         val runtimeSupports = adapter?.integratedOnAndroid == true && modality in adapter.supportedInputs
         val explanation = when {
             !modelSupports -> "The selected model does not advertise $modality input."
-            !runtimeSupports -> "The model catalogue lists $modality input, but this Android runtime adapter is not integrated and validated yet."
+            !runtimeSupports -> "The model catalogue lists $modality input, but this Android runtime adapter is not integrated yet."
             else -> "The selected Android runtime accepts $modality input."
         }
         return MediaInputCheck(modality, modelSupports, runtimeSupports, explanation)
