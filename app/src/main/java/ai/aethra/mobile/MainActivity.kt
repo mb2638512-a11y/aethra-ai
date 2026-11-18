@@ -189,9 +189,39 @@ private fun AethraChatScreen() {
                                         }
                                     },
                                     text = { Text(candidate.displayName) },
-                                    onClick = { selectedModel = candidate.displayName; modelMenu = false }
+                                    onClick = {
+                                        selectedModel = candidate.displayName
+                                        modelMenu = false
+                                        scope.launch {
+                                            sessionState.value?.close()
+                                            sessionState.value = null
+                                            try {
+                                                ModelExecutionPolicy.assertCanLoad(context, candidate.minimumRamGb ?: 6, 0.25)
+                                                val modelFile = File(context.getExternalFilesDir(null), "models/gemma-4-E2B-it.litertlm")
+                                                val expectedHash = ModelAssets.byModel[candidate.id]?.firstOrNull()?.expectedSha256
+                                                if (expectedHash != null) {
+                                                    val actualHash = withContext(Dispatchers.IO) { ModelDownloadManager(context).sha256(modelFile) }
+                                                    check(actualHash.equals(expectedHash, ignoreCase = true)) { "Model checksum mismatch." }
+                                                }
+                                                val session = LiteRtModelSession(modelFile.absolutePath)
+                                                session.open()
+                                                sessionState.value = session
+                                            } catch (error: Throwable) {
+                                                messages.add(ChatMessage("Model not started: ${error.message ?: "device check failed"}", false))
+                                            }
+                                        }
+                                    }
                                 )
                             }
+                            DropdownMenuItem(
+                                text = { Text("Stop running model") },
+                                enabled = sessionState.value != null,
+                                onClick = {
+                                    sessionState.value?.close()
+                                    sessionState.value = null
+                                    modelMenu = false
+                                }
+                            )
                             HorizontalDivider()
                             DropdownMenuItem(
                                 text = { Text("Model Library • downloads") },
@@ -267,6 +297,7 @@ private fun AethraChatScreen() {
                                             } else {
                                                 var session = sessionState.value
                                                 if (session == null) {
+                                                    ModelExecutionPolicy.assertCanLoad(context, candidate.minimumRamGb ?: 6, 0.25)
                                                     val expectedHash = ModelAssets.byModel["gemma-4-e2b"]?.firstOrNull()?.expectedSha256
                                                     if (expectedHash != null) {
                                                         val actualHash = withContext(Dispatchers.IO) {
