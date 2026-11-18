@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.pdf.PdfRenderer
 import android.media.MediaMetadataRetriever
+import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
@@ -200,7 +201,7 @@ object MediaInputProcessor {
                 if (format.containsKey(MediaFormat.KEY_MAX_INPUT_SIZE)) format.getInteger(MediaFormat.KEY_MAX_INPUT_SIZE) else 0
             )
             val buffer = java.nio.ByteBuffer.allocateDirect(capacity)
-            val info = MediaMuxer.BufferInfo()
+            val info = MediaCodec.BufferInfo()
             val maxDurationUs = 60_000_000L
             while (true) {
                 buffer.clear()
