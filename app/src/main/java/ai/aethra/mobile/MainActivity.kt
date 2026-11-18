@@ -225,17 +225,17 @@ private fun AethraChatScreen() {
                                                     false
                                                 )
                                             } else {
-                                                val expectedHash = ModelAssets.byModel["gemma-4-e2b"]?.firstOrNull()?.expectedSha256
-                                                if (expectedHash != null) {
-                                                    val actualHash = withContext(Dispatchers.IO) {
-                                                        ModelDownloadManager(context).sha256(modelFile)
-                                                    }
-                                                    check(actualHash.equals(expectedHash, ignoreCase = true)) {
-                                                        "Gemma model checksum mismatch. Delete the model and download it again."
-                                                    }
-                                                }
                                                 var session = sessionState.value
                                                 if (session == null) {
+                                                    val expectedHash = ModelAssets.byModel["gemma-4-e2b"]?.firstOrNull()?.expectedSha256
+                                                    if (expectedHash != null) {
+                                                        val actualHash = withContext(Dispatchers.IO) {
+                                                            ModelDownloadManager(context).sha256(modelFile)
+                                                        }
+                                                        check(actualHash.equals(expectedHash, ignoreCase = true)) {
+                                                            "Gemma model checksum mismatch. Delete the model and download it again."
+                                                        }
+                                                    }
                                                     session = LiteRtModelSession(modelFile.absolutePath)
                                                     session.open()
                                                     sessionState.value = session
