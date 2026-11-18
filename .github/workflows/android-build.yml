@@ -42,6 +42,17 @@ jobs:
               exit 1
             }
           done
+      - name: Verify exported GGUF JNI entry points
+        run: |
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          unzip -p "$APK" lib/arm64-v8a/libaethra_llama_jni.so > /tmp/libaethra_llama_jni.so
+          for symbol in nativeLoadModel nativeGenerate nativeGenerateStream nativeCancel nativeUnload nativeCapabilities nativeSystemInfo; do
+            readelf -Ws /tmp/libaethra_llama_jni.so | grep -q "Java_ai_aethra_mobile_NativeGgufRuntime_${symbol}" || {
+              echo "Missing JNI entry point: ${symbol}"
+              exit 1
+            }
+          done
+          echo "All seven NativeGgufRuntime JNI entry points are exported."
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
