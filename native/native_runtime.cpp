@@ -283,15 +283,43 @@ std::string generate_locked(const std::string & prompt,
 
     const llama_vocab * vocab = llama_model_get_vocab(g_model);
     std::string output;
+    std::string pending_utf8;
+    auto emit_callback_bytes = [&](const std::string & bytes) {
+        if (callback_env == nullptr || callback == nullptr || callback_method == nullptr || bytes.empty()) return;
+        jstring piece = to_java(callback_env, bytes);
+        if (piece != nullptr) {
+            callback_env->CallVoidMethod(callback, callback_method, piece);
+            callback_env->DeleteLocalRef(piece);
+        }
+    };
     auto emit_piece = [&](const char * data, int32_t size) {
         if (size <= 0) return;
         output.append(data, static_cast<size_t>(size));
-        if (callback_env != nullptr && callback != nullptr && callback_method != nullptr) {
-            jstring piece = to_java(callback_env, std::string(data, static_cast<size_t>(size)));
-            if (piece != nullptr) {
-                callback_env->CallVoidMethod(callback, callback_method, piece);
-                callback_env->DeleteLocalRef(piece);
+        if (callback_env == nullptr || callback == nullptr || callback_method == nullptr) return;
+
+        // A UTF-8 code point may be split across llama.cpp token pieces. Buffer
+        // incomplete trailing sequences so Kotlin never receives replacement glyphs.
+        pending_utf8.append(data, static_cast<size_t>(size));
+        size_t index = 0;
+        while (index < pending_utf8.size()) {
+            const uint8_t lead = static_cast<uint8_t>(pending_utf8[index]);
+            size_t width = 1;
+            if (lead >= 0xC2 && lead <= 0xDF) width = 2;
+            else if (lead >= 0xE0 && lead <= 0xEF) width = 3;
+            else if (lead >= 0xF0 && lead <= 0xF4) width = 4;
+            if (index + width > pending_utf8.size()) break;
+            bool continuation_ok = true;
+            for (size_t part = 1; part < width; ++part) {
+                if ((static_cast<uint8_t>(pending_utf8[index + part]) & 0xC0) != 0x80) {
+                    continuation_ok = false;
+                    break;
+                }
             }
+            index += continuation_ok ? width : 1;
+        }
+        if (index > 0) {
+            emit_callback_bytes(pending_utf8.substr(0, index));
+            pending_utf8.erase(0, index);
         }
     };
     max_tokens = std::max(1, std::min(1024, max_tokens));
@@ -327,6 +355,7 @@ std::string generate_locked(const std::string & prompt,
     }
 
     llama_sampler_free(sampler);
+    if (!pending_utf8.empty()) emit_callback_bytes(pending_utf8);
     return output;
 }
 
