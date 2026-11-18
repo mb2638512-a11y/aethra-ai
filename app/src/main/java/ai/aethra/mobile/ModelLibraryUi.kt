@@ -45,6 +45,7 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
     var searchQuery by remember { androidx.compose.runtime.mutableStateOf("") }
     var selectedCategory by remember { androidx.compose.runtime.mutableStateOf("All") }
     var categoryMenu by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var pendingDelete by remember { androidx.compose.runtime.mutableStateOf<ModelCandidate?>(null) }
     val categories = listOf("All") + ModelCatalogue.candidates.map { it.category }.distinct().sorted()
 
     LaunchedEffect(Unit) {
@@ -218,12 +219,7 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
                                     }) { Text("Cancel") }
                                 }
                                 if (filesPresentCount > 0 || ids.isNotEmpty()) {
-                                    TextButton(onClick = {
-                                        onDeleteModel(model)
-                                        activeDownloads.remove(model.id)
-                                        ids.forEach { snapshots.remove(it) }
-                                        ModelDownloadStore.clear(context, model.id)
-                                    }) { Text("Delete files") }
+                                    TextButton(onClick = { pendingDelete = model }) { Text("Delete files") }
                                 }
                             }
                         }
@@ -233,6 +229,27 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
     )
+
+    pendingDelete?.let { model ->
+        AlertDialog(
+            onDismissRequest = { pendingDelete = null },
+            title = { Text("Delete downloaded model?") },
+            text = { Text("Remove all local files and cancel any downloads for ${model.displayName}? You can download them again later.") },
+            confirmButton = {
+                TextButton(onClick = {
+                    val savedIds = ModelDownloadStore.load(context, model.id)
+                    onDeleteModel(model)
+                    activeDownloads.remove(model.id)
+                    savedIds.forEach { snapshots.remove(it) }
+                    ModelDownloadStore.clear(context, model.id)
+                    pendingDelete = null
+                }) { Text("Delete") }
+            },
+            dismissButton = {
+                TextButton(onClick = { pendingDelete = null }) { Text("Keep files") }
+            }
+        )
+    }
 
     if (showSettings) {
         ModelSettingsDialog(onDismiss = { showSettings = false })
