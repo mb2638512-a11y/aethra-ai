@@ -101,15 +101,23 @@ object MediaInputProcessor {
         val options = BitmapFactory.Options().apply { inSampleSize = sample }
         val decoded = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
             ?: error("Could not decode selected image.")
-        val scale = minOf(1f, maxDimension.toFloat() / maxOf(decoded.width, decoded.height).toFloat())
-        val resized = if (scale < 1f) Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true) else decoded
-        val file = File.createTempFile("aethra_image_", ".jpg", context.cacheDir)
-        FileOutputStream(file).use { output ->
-            check(resized.compress(Bitmap.CompressFormat.JPEG, 88, output)) { "Could not encode selected image." }
+        var resized: Bitmap? = null
+        var file: File? = null
+        try {
+            val scale = minOf(1f, maxDimension.toFloat() / maxOf(decoded.width, decoded.height).toFloat())
+            resized = if (scale < 1f) Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true) else decoded
+            file = File.createTempFile("aethra_image_", ".jpg", context.cacheDir)
+            FileOutputStream(file).use { output ->
+                check(resized.compress(Bitmap.CompressFormat.JPEG, 88, output)) { "Could not encode selected image." }
+            }
+            return file
+        } catch (error: Throwable) {
+            file?.delete()
+            throw error
+        } finally {
+            if (resized != null && resized !== decoded) resized.recycle()
+            decoded.recycle()
         }
-        if (resized !== decoded) resized.recycle()
-        decoded.recycle()
-        return file
     }
 
     private fun copyToCache(context: Context, uri: Uri, extension: String): File {
