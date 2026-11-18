@@ -25,7 +25,7 @@ object AudioTranscoder {
         val raw = File.createTempFile("${prefix}raw_", ".pcm", context.cacheDir)
         var wav: File? = null
         try {
-            val decoded = decodeToMonoPcm(context, uri, raw, maxSeconds.coerceIn(1, 180))
+            val decoded = decodeToMonoPcm(context, uri, raw, maxSeconds.coerceIn(1, 30))
             check(decoded.sampleCount > 0L) { "The selected audio contains no decodable samples." }
             wav = File.createTempFile(prefix, ".wav", context.cacheDir)
             writeResampledWav(raw, wav, decoded.sampleCount, decoded.sampleRate)
@@ -146,7 +146,7 @@ object AudioTranscoder {
 
     private fun writeResampledWav(raw: File, wav: File, sourceSamples: Long, sourceRate: Int) {
         val outputSamples = (sourceSamples * TARGET_SAMPLE_RATE + sourceRate - 1L) / sourceRate
-        val dataBytes = outputSamples * 2L
+        val dataBytes = outputSamples * 4L
         require(dataBytes <= 0x7fffffffL) { "Audio segment is too large to encode as WAV." }
         RandomAccessFile(raw, "r").use { source ->
             FileOutputStream(wav).use { output ->
@@ -156,8 +156,12 @@ object AudioTranscoder {
                     val sourceIndex = (outputIndex * sourceRate / TARGET_SAMPLE_RATE).coerceAtMost(sourceSamples - 1L)
                     source.seek(sourceIndex * 2L)
                     val sample = Short.reverseBytes(source.readShort()).toInt()
-                    output.write(sample and 0xff)
-                    output.write((sample shr 8) and 0xff)
+                    val normalized = (sample / 32768.0f).coerceIn(-1.0f, 1.0f)
+                    val bits = java.lang.Float.floatToIntBits(normalized)
+                    output.write(bits and 0xff)
+                    output.write((bits shr 8) and 0xff)
+                    output.write((bits shr 16) and 0xff)
+                    output.write((bits shr 24) and 0xff)
                     outputIndex++
                 }
             }
