@@ -367,23 +367,20 @@ private fun AethraChatScreen() {
                         onClick = {
                             if (generating) {
                                 jobState.value?.cancel()
-                            } else if (selectedAttachment != null) {
-                                val attachment = selectedAttachment!!
-                                val modelId = ModelCatalogue.candidates.firstOrNull { it.displayName == selectedModel }?.id ?: "gemma-4-e2b"
-                                val inputCheck = MediaInputRouter.check(modelId, attachment.mimeType)
-                                messages.add(ChatMessage(
-                                    "Attachment: ${attachment.name} (${attachment.mimeType ?: "unknown type"}). ${inputCheck.explanation} The file has not been sent to model inference.",
-                                    false
-                                ))
-                                selectedAttachment = null
-                            } else if (prompt.isNotBlank()) {
+                            } else if (selectedAttachment != null || prompt.isNotBlank()) {
                                 val requestText = prompt.trim()
-                                messages.add(ChatMessage(requestText, true))
+                                val attachment = selectedAttachment
+                                val userMessage = if (attachment != null) {
+                                    listOf("📎 " + attachment.name, requestText).filter { it.isNotBlank() }.joinToString("\n")
+                                } else requestText
+                                messages.add(ChatMessage(userMessage, true))
                                 prompt = ""
+                                selectedAttachment = null
                                 jobState.value = scope.launch {
                                     generating = true
                                     val responseIndex = messages.size
                                     messages.add(ChatMessage("", false))
+                                    var preparedInput: PreparedMediaInput? = null
                                     try {
                                         val candidate = ModelCatalogue.candidates.firstOrNull { it.displayName == selectedModel }
                                         if (candidate?.id != "gemma-4-e2b") {
@@ -392,6 +389,11 @@ private fun AethraChatScreen() {
                                                 false
                                             )
                                         } else {
+                                            if (attachment != null) {
+                                                val inputCheck = MediaInputRouter.check(candidate.id, attachment.mimeType)
+                                                check(inputCheck.acceptedByAndroidRuntime) { inputCheck.explanation }
+                                                preparedInput = MediaInputProcessor.prepare(context, attachment.uri, attachment.mimeType, requestText)
+                                            }
                                             val modelFile = modelFileFor(context, candidate) ?: error("No model artifact manifest is available.")
                                             if (!modelFile.exists()) {
                                                 messages[responseIndex] = ChatMessage(
@@ -402,11 +404,9 @@ private fun AethraChatScreen() {
                                                 var session = sessionState.value
                                                 if (session == null) {
                                                     ModelExecutionPolicy.assertCanLoad(context, candidate.minimumRamGb ?: 6, 0.25)
-                                                    val expectedHash = ModelAssets.byModel["gemma-4-e2b"]?.firstOrNull()?.expectedSha256
+                                                    val expectedHash = ModelAssets.byModel[candidate.id]?.firstOrNull()?.expectedSha256
                                                     if (expectedHash != null) {
-                                                        val actualHash = withContext(Dispatchers.IO) {
-                                                            ModelDownloadManager(context).sha256(modelFile)
-                                                        }
+                                                        val actualHash = withContext(Dispatchers.IO) { ModelDownloadManager(context).sha256(modelFile) }
                                                         check(actualHash.equals(expectedHash, ignoreCase = true)) {
                                                             "Gemma model checksum mismatch. Delete the model and download it again."
                                                         }
@@ -415,7 +415,8 @@ private fun AethraChatScreen() {
                                                     session.open()
                                                     sessionState.value = session
                                                 }
-                                                session.generate(requestText).collect { chunk ->
+                                                val output = preparedInput?.let { session.generate(it.contents) } ?: session.generate(requestText)
+                                                output.collect { chunk ->
                                                     val current = messages[responseIndex]
                                                     messages[responseIndex] = current.copy(text = current.text + chunk)
                                                 }
@@ -428,6 +429,7 @@ private fun AethraChatScreen() {
                                             false
                                         )
                                     } finally {
+                                        preparedInput?.close()
                                         generating = false
                                         jobState.value = null
                                     }
