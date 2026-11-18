@@ -31,7 +31,7 @@ data class RuntimeAdapterInfo(
 object ModelRuntimeRegistry {
     private val text = setOf(ModelModality.TEXT)
     private val capabilities = mapOf(
-        "gemma-4-e2b" to ModelCapabilities(text, text, "Current integrated chat path is text-only."),
+        "gemma-4-e2b" to ModelCapabilities(setOf(ModelModality.TEXT, ModelModality.IMAGE, ModelModality.AUDIO, ModelModality.VIDEO, ModelModality.DOCUMENT), text, "LiteRT-LM vision/audio inputs; video is sampled into image frames and PDFs are rendered into page images."),
         "lfm3-omni-2b" to ModelCapabilities(
             setOf(ModelModality.TEXT, ModelModality.IMAGE, ModelModality.AUDIO, ModelModality.VIDEO),
             setOf(ModelModality.TEXT, ModelModality.AUDIO),
@@ -74,7 +74,7 @@ object ModelRuntimeRegistry {
     )
 
     private val adapters = mapOf(
-        "gemma-4-e2b" to RuntimeAdapterInfo("LiteRT-LM Android", text, text, true)
+        "gemma-4-e2b" to RuntimeAdapterInfo("LiteRT-LM Android", setOf(ModelModality.TEXT, ModelModality.IMAGE, ModelModality.AUDIO, ModelModality.VIDEO, ModelModality.DOCUMENT), text, true)
     )
 
     fun capabilitiesFor(modelId: String): ModelCapabilities =
