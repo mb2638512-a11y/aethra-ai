@@ -11,7 +11,7 @@ import java.io.File
 
 /**
  * Thin coroutine wrapper over the process-wide llama.cpp/libmtmd JNI session.
- * The current JNI call returns a completed turn rather than token-by-token deltas.
+ * Native generation streams decoded token pieces through a JNI callback into Kotlin Flow.
  * This session is not exposed by Model Library until device validation passes.
  */
 class NativeGgufModelSession(
