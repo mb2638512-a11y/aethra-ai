@@ -42,49 +42,54 @@ object MediaInputProcessor {
         if (prompt.isNotBlank()) contents += Content.Text(prompt)
         val note: String
 
-        when {
-            mimeType?.startsWith("image/") == true -> {
-                if (prompt.isBlank()) contents += Content.Text("Describe this image in detail.")
-                val file = stageImage(context, uri, maxImageDimension)
-                files += file
-                contents += Content.ImageFile(file.absolutePath)
-                note = "Image attached for visual analysis."
+        try {
+            when {
+                mimeType?.startsWith("image/") == true -> {
+                    if (prompt.isBlank()) contents += Content.Text("Describe this image in detail.")
+                    val file = stageImage(context, uri, maxImageDimension)
+                    files += file
+                    contents += Content.ImageFile(file.absolutePath)
+                    note = "Image attached for visual analysis."
+                }
+                mimeType?.startsWith("audio/") == true -> {
+                    if (prompt.isBlank()) contents += Content.Text("Transcribe and summarize this audio.")
+                    val file = copyToCache(context, uri, extensionFor(mimeType))
+                    files += file
+                    contents += Content.AudioFile(file.absolutePath)
+                    note = "Audio attached for model audio understanding."
+                }
+                mimeType?.startsWith("video/") == true -> {
+                    val frames = extractVideoFrames(context, uri, maxVideoFrames)
+                    check(frames.isNotEmpty()) { "Could not decode frames from this video." }
+                    files += frames
+                    contents.clear()
+                    contents += Content.Text((if (prompt.isBlank()) "Summarize this video using the sampled frames." else prompt) + " Video input is represented by up to $maxVideoFrames sampled frames; the audio track is not included yet.")
+                    frames.forEach { contents += Content.ImageFile(it.absolutePath) }
+                    note = "Video sampled into ${frames.size} image frames. Video audio-track analysis is not included yet."
+                }
+                mimeType == "application/pdf" -> {
+                    val pages = renderPdfPages(context, uri, maxPdfPages)
+                    check(pages.isNotEmpty()) { "Could not render pages from this PDF." }
+                    files += pages
+                    contents.clear()
+                    contents += Content.Text((if (prompt.isBlank()) "Analyze this PDF." else prompt) + " PDF input is represented by up to $maxPdfPages rendered pages.")
+                    pages.forEach { contents += Content.ImageFile(it.absolutePath) }
+                    note = "PDF rendered into ${pages.size} page images for visual analysis."
+                }
+                mimeType?.startsWith("text/") == true -> {
+                    val text = resolver.openInputStream(uri)?.bufferedReader()?.use { it.readText().take(MAX_TEXT_CHARS) }
+                        ?: error("Could not read this text document.")
+                    contents += Content.Text((if (prompt.isBlank()) "Analyze this document." else prompt) + "\n\nDocument content:\n" + text)
+                    note = "Text document content added to the prompt."
+                }
+                else -> error("Unsupported file type: ${mimeType ?: "unknown"}. Use image, audio, video, PDF or plain text.")
             }
-            mimeType?.startsWith("audio/") == true -> {
-                if (prompt.isBlank()) contents += Content.Text("Transcribe and summarize this audio.")
-                val file = copyToCache(context, uri, extensionFor(mimeType))
-                files += file
-                contents += Content.AudioFile(file.absolutePath)
-                note = "Audio attached for model audio understanding."
-            }
-            mimeType?.startsWith("video/") == true -> {
-                val frames = extractVideoFrames(context, uri, maxVideoFrames)
-                check(frames.isNotEmpty()) { "Could not decode frames from this video." }
-                files += frames
-                contents.clear()
-                contents += Content.Text((if (prompt.isBlank()) "Summarize this video using the sampled frames." else prompt) + " Video input is represented by up to $maxVideoFrames sampled frames; the audio track is not included yet.")
-                frames.forEach { contents += Content.ImageFile(it.absolutePath) }
-                note = "Video sampled into ${frames.size} image frames. Video audio-track analysis is not included yet."
-            }
-            mimeType == "application/pdf" -> {
-                val pages = renderPdfPages(context, uri, maxPdfPages)
-                check(pages.isNotEmpty()) { "Could not render pages from this PDF." }
-                files += pages
-                contents.clear()
-                contents += Content.Text((if (prompt.isBlank()) "Analyze this PDF." else prompt) + " PDF input is represented by up to $maxPdfPages rendered pages.")
-                pages.forEach { contents += Content.ImageFile(it.absolutePath) }
-                note = "PDF rendered into ${pages.size} page images for visual analysis."
-            }
-            mimeType?.startsWith("text/") == true -> {
-                val text = resolver.openInputStream(uri)?.bufferedReader()?.use { it.readText().take(MAX_TEXT_CHARS) }
-                    ?: error("Could not read this text document.")
-                contents += Content.Text((if (prompt.isBlank()) "Analyze this document." else prompt) + "\n\nDocument content:\n" + text)
-                note = "Text document content added to the prompt."
-            }
-            else -> error("Unsupported file type: ${mimeType ?: "unknown"}. Use image, audio, video, PDF or plain text.")
+            check(contents.isNotEmpty()) { "No model input was prepared." }
+            PreparedMediaInput(Contents.of(*contents.toTypedArray()), files, note)
+        } catch (error: Throwable) {
+            files.forEach { it.delete() }
+            throw error
         }
-        check(contents.isNotEmpty()) { "No model input was prepared." }
-        PreparedMediaInput(Contents.of(*contents.toTypedArray()), files, note)
     }
 
     private fun stageImage(context: Context, uri: Uri, maxDimension: Int): File {
