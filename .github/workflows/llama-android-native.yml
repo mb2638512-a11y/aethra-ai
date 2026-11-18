@@ -31,12 +31,14 @@ jobs:
           ref: b11960
           path: third_party/llama.cpp
 
-      - name: Install Android NDK
-        uses: android-actions/setup-android@v3
-
       - name: Install pinned NDK and CMake
         run: |
-          sdkmanager --install "ndk;27.2.12479018" "cmake;3.31.6"
+          export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}"
+          SDKMANAGER="$(find "$ANDROID_SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses
+          "$SDKMANAGER" --install "ndk;27.2.12479018" "cmake;3.31.6"
+          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT" >> "$GITHUB_ENV"
           echo "ANDROID_NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.2.12479018" >> "$GITHUB_ENV"
 
       - name: Configure llama.cpp and libmtmd for Android
