@@ -13,7 +13,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: llama-android-native-\${{ github.ref }}
+  group: llama-android-native-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
