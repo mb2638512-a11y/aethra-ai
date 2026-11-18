@@ -16,7 +16,9 @@ A local-first native Android AI workspace. The goal is to combine private on-dev
 - Model catalogue search and category filtering, with explicit input/output modality labels.
 - System speech recognition as voice-to-text input.
 - Android system TextToSpeech playback for assistant text responses.
-- Media input pipeline for images, audio files, video frame sampling, PDF page rendering and plain-text documents, routed into LiteRT-LM multimodal contents for Gemma 4 E2B.
+- Media input pipeline for gallery/camera images, audio files, video frame sampling, PDF page rendering and plain-text documents, routed into LiteRT-LM multimodal contents for Gemma 4 E2B.
+- Conversation transcript sharing through the Android Sharesheet.
+- Persisted model download IDs for progress recovery after app restarts; failed preprocessing removes staged temporary media.
 - Functional workspace menu for Model Library, runtime settings and chat reset.
 - Multimodal runtime architecture and delivery plan.
 - GitHub Actions Android debug build workflow.
