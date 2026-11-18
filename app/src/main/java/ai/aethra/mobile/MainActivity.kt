@@ -171,20 +171,26 @@ private fun AethraChatScreen() {
     }
     @Suppress("DEPRECATION")
     fun startAudioRecording() {
+        var pendingFile: File? = null
+        var pendingRecorder: MediaRecorder? = null
         runCatching {
-            val file = File.createTempFile("aethra_audio_", ".m4a", context.cacheDir)
-            val recorder = MediaRecorder()
-            recorder.setAudioSource(MediaRecorder.AudioSource.MIC)
-            recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            recorder.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            recorder.setOutputFile(file.absolutePath)
-            recorder.prepare()
-            recorder.start()
-            audioRecorder = recorder
-            audioRecordingFile = file
+            pendingFile = File.createTempFile("aethra_audio_", ".m4a", context.cacheDir)
+            pendingRecorder = MediaRecorder()
+            pendingRecorder?.setAudioSource(MediaRecorder.AudioSource.MIC)
+            pendingRecorder?.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+            pendingRecorder?.setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+            pendingRecorder?.setOutputFile(pendingFile?.absolutePath)
+            pendingRecorder?.prepare()
+            pendingRecorder?.start()
+            audioRecorder = pendingRecorder
+            audioRecordingFile = pendingFile
             audioRecording = true
             speechNotice = "Recording audio… tap Stop to attach."
-        }.onFailure { speechNotice = it.message ?: "Audio recording could not start." }
+        }.onFailure {
+            pendingRecorder?.release()
+            pendingFile?.delete()
+            speechNotice = it.message ?: "Audio recording could not start."
+        }
     }
     fun stopAudioRecording() {
         val recorder = audioRecorder
@@ -256,6 +262,9 @@ private fun AethraChatScreen() {
             jobState.value?.cancel()
             sessionState.value?.close()
             sessionState.value = null
+            runCatching { audioRecorder?.stop() }
+            audioRecorder?.release()
+            audioRecordingFile?.delete()
         }
     }
     val messages = remember {
