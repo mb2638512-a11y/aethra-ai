@@ -209,6 +209,11 @@ private fun AethraChatScreen() {
             runCatching {
                 ModelExecutionPolicy.assertCanLoad(context, defaultModel.minimumRamGb ?: 6, 0.25)
                 val modelFile = modelFileFor(context, defaultModel) ?: error("No model artifact manifest is available.")
+                val expectedHash = ModelAssets.byModel[defaultModel.id]?.firstOrNull()?.expectedSha256
+                if (expectedHash != null) {
+                    val actualHash = withContext(Dispatchers.IO) { ModelDownloadManager(context).sha256(modelFile) }
+                    check(actualHash.equals(expectedHash, ignoreCase = true)) { "Gemma model checksum mismatch. Delete and download it again." }
+                }
                 LiteRtModelSession(modelFile.absolutePath).also { it.open() }
             }.onSuccess { sessionState.value = it }
         }
