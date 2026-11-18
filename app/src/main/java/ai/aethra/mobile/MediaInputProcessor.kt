@@ -20,6 +20,9 @@ data class PreparedMediaInput(
     private val temporaryFiles: List<File>,
     val preparationNote: String,
 ) : Closeable {
+    /** Absolute staged file paths for adapters such as llama.cpp/libmtmd. */
+    val mediaPaths: List<String> get() = temporaryFiles.map { it.absolutePath }
+
     override fun close() { temporaryFiles.forEach { it.delete() } }
 }
 
