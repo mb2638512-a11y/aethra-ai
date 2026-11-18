@@ -7,6 +7,29 @@ import org.junit.Test
 
 class ModelRuntimeRegistryTest {
     @Test
+    fun pcmWavHeaderHasCorrectMono16KhzPcmFields() {
+        val header = PcmWavFormat.header(32000)
+        assertEquals(44, header.size)
+        assertEquals("RIFF", String(header.copyOfRange(0, 4), Charsets.US_ASCII))
+        assertEquals("WAVE", String(header.copyOfRange(8, 12), Charsets.US_ASCII))
+        assertEquals("fmt ", String(header.copyOfRange(12, 16), Charsets.US_ASCII))
+        assertEquals(16_000, littleEndianInt(header, 24))
+        assertEquals(32_000, littleEndianInt(header, 28))
+        assertEquals(1, littleEndianShort(header, 22))
+        assertEquals(16, littleEndianShort(header, 34))
+        assertEquals(32000, littleEndianInt(header, 40))
+    }
+
+    private fun littleEndianInt(bytes: ByteArray, offset: Int): Int =
+        (bytes[offset].toInt() and 0xff) or
+            ((bytes[offset + 1].toInt() and 0xff) shl 8) or
+            ((bytes[offset + 2].toInt() and 0xff) shl 16) or
+            ((bytes[offset + 3].toInt() and 0xff) shl 24)
+
+    private fun littleEndianShort(bytes: ByteArray, offset: Int): Int =
+        (bytes[offset].toInt() and 0xff) or ((bytes[offset + 1].toInt() and 0xff) shl 8)
+
+    @Test
     fun onlyIntegratedAndroidRuntimeIsRunnable() {
         assertEquals(setOf("gemma-4-e2b"), ModelRuntimeRegistry.runnableModelIds())
     }
