@@ -1,35 +1,62 @@
-# Model compatibility verification
+# Model compatibility and integration status
 
-This is an evidence-based evaluation record, not a claim that these candidates already run inside AETHRA AI.
+Last reviewed: 2026-11-18.
 
-## Verified public facts
+This document separates upstream support from AETHRA implementation status. A model is not considered supported by AETHRA until its runtime is integrated, the exact artifacts are downloaded and verified, and it passes tests on a physical Android device.
 
-| Candidate/runtime | Verified information | AETHRA status |
-|---|---|---|
-| LFM3-Omni-2B | Official Liquid AI model card describes a 2.17B-parameter multimodal model with text, image, video and audio inputs and text/speech outputs. The official GGUF repository provides llama.cpp-oriented artifacts. | Candidate only. Android integration and all modalities remain untested in this app. |
-| Gemma4-E2B | Google AI Edge LiteRT-LM documentation lists Gemma4-E2B as a supported model and documents Kotlin as a stable API for native Android. Published reference size is about 2,583 MB; that is not a promise of runtime RAM use. | Strong Android runtime candidate, but device fit and app integration remain untested. |
-| MiniCPM-V 4.6 | Kept as a vision/document research candidate. | Exact official artifact, license, Android runtime and processor compatibility still need verification. |
+## Three requested models
 
-## Runtime direction
+| Model | Official artifact / quantization | Approximate download | Runtime direction | AETHRA status |
+|---|---|---:|---|---|
+| LFM3-Omni-2B | GGUF Q4_K_M plus matching multimodal projector | 1.1 GB + 292 MB | llama.cpp Android | Catalogue metadata only; Android native runtime not integrated |
+| Gemma 4 E2B | `.litertlm` bundle | 2.58 GB | LiteRT-LM Kotlin API | LiteRT-LM dependency and CPU session adapter added; downloader, UI wiring and device test remain |
+| MiniCPM-V 4.6 | GGUF Q4_K_M plus vision projector | About 1.6 GB total | llama.cpp Android | Catalogue metadata only; Android native runtime not integrated |
 
-- **LiteRT-LM:** Google documents a stable Kotlin API for native Android and lists Gemma 4 among supported model families. Evaluate this first for Gemma4-E2B.
-- **llama.cpp:** Its Android documentation includes a native Android sample using GGUF metadata and an inference engine. The LFM3-Omni GGUF model card points to llama.cpp, but this does not by itself prove that AETHRA's Android build supports LFM3 image/audio/video paths. Pin and test a compatible llama.cpp revision before integration.
+## Runtime integration
 
-## Official references
+### Gemma 4 E2B — first integration target
 
-- Liquid AI LFM3-Omni-2B model card: https://huggingface.co/LiquidAI/LFM3-Omni-2B
-- Liquid AI LFM3-Omni-2B GGUF: https://huggingface.co/LiquidAI/LFM3-Omni-2B-GGUF
-- Google LiteRT-LM overview and Kotlin API status: https://developers.google.com/edge/litert-lm/overview
-- Google LiteRT getting started: https://developers.google.com/edge/litert/overview
-- llama.cpp Android guide: https://github.com/ggml-org/llama.cpp/blob/master/docs/android.md
+AETHRA now includes the LiteRT-LM Android dependency and `LiteRtModelSession`, a coroutine-based session adapter that:
+- Initializes a model from an app-private filesystem path off the UI thread.
+- Creates and retains a conversation.
+- Exposes streaming generation as a Kotlin Flow.
+- Closes the conversation and engine to release native resources.
 
-## Acceptance criteria before marking any model supported
+The adapter is not yet connected to the chat screen. The model downloader, checksum verification, cancellation, progress UI, GPU/NPU selection and physical-device tests remain outstanding. The model file is not bundled in the APK.
 
-- Link the official model card and license.
-- Record artifact filename, format, quantization and exact byte size.
-- Verify a published checksum or calculate SHA-256 after download.
-- Record the exact runtime version/commit and Android ABI.
-- Run on a physical Android device and record device model, Android version, RAM, peak memory, latency and failures.
-- Test offline mode with network disabled.
-- Test each modality using real inputs. Image support does not imply video or audio support.
-- Do not mark a candidate supported until all relevant checks pass.
+Official model/runtime references:
+- https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm
+- https://developers.google.com/edge/litert-lm/android
+- https://developers.google.com/edge/litert-lm/overview
+
+Google's published reference lists the Gemma 4 E2B bundle at about 2.58 GB and an 8 GB minimum-device-memory recommendation. Performance figures are from specific reference devices and must not be extrapolated to other phones.
+
+### LFM3-Omni-2B
+
+The official Liquid AI GGUF repository provides Q4_K_M weights around 1.1 GB and a Q4_K_M multimodal projector around 292 MB. Its model card documents llama.cpp support for text, image, audio and video workflows. That upstream support does not mean AETHRA's Android app has those pathways yet.
+
+References:
+- https://huggingface.co/LiquidAI/LFM3-Omni-2B
+- https://huggingface.co/LiquidAI/LFM3-Omni-2B-GGUF
+- https://github.com/ggml-org/llama.cpp/blob/master/docs/android.md
+
+### MiniCPM-V 4.6
+
+OpenBMB's deployment guide documents llama.cpp and an official GGUF repository. It lists the 1.3B Q4_K_M variant at about 1.6 GB total and recommends at least 6 GB device RAM. AETHRA still needs the Android native integration and modality tests.
+
+References:
+- https://openbmb.cn/docs/en/guides/minicpm-v/minicpm-v-4.6/deploy
+- https://huggingface.co/openbmb/MiniCPM-V-4.6-gguf
+- https://github.com/OpenBMB/MiniCPM-V-Apps
+
+## Acceptance criteria
+
+Before a model is marked installed or supported:
+1. Download only from the official model repository and show its license.
+2. Record exact filenames, byte sizes, quantization and SHA-256.
+3. Pin the runtime version and supported Android ABIs.
+4. Check free storage and memory before loading.
+5. Test text generation, streaming, cancellation and app lifecycle.
+6. Test each advertised modality using real sample inputs.
+7. Repeat tests offline and record device, Android version, peak RAM and latency.
+8. Never infer video/audio support from image support, or upstream support from AETHRA support.
