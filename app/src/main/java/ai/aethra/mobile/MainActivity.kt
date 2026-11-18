@@ -96,13 +96,16 @@ private fun describeAttachment(context: Context, uri: Uri): MediaAttachment {
 /** Only expose models that are both integrated with a real chat runtime and fully present locally. */
 private fun availableChatModels(context: Context): List<ModelCandidate> {
     val integratedModelIds = ModelRuntimeRegistry.runnableModelIds()
-    val modelDirectory = File(context.getExternalFilesDir(null), "models")
+    val downloader = ModelDownloadManager(context)
     return ModelCatalogue.candidates.filter { candidate ->
         if (candidate.id !in integratedModelIds) return@filter false
         val assets = ModelAssets.byModel[candidate.id].orEmpty()
-        assets.isNotEmpty() && assets.all { asset ->
-            File(modelDirectory, asset.fileName).let { it.isFile && it.length() > 0L }
+        val filesPresent = assets.isNotEmpty() && assets.all { asset ->
+            File(downloader.modelDirectory(), asset.fileName).let { it.isFile && it.length() > 0L }
         }
+        val downloadIds = ModelDownloadStore.load(context, candidate.id)
+        val snapshots = downloadIds.mapNotNull { downloader.query(it) }
+        ModelDownloadReadiness.isReady(filesPresent, downloadIds.size, snapshots)
     }
 }
 
@@ -679,7 +682,7 @@ private fun AethraChatScreen() {
                     TextButton(onClick = { showModelLibrary = true; infoDialog = false }) { Text("Model Library & Downloads") }
                     TextButton(onClick = { showSettings = true; infoDialog = false }) { Text("Runtime & Device Settings") }
                     TextButton(onClick = { messages.clear(); ChatHistoryStore.clear(context); infoDialog = false }) { Text("New Chat / Clear History") }
-                    Text("Input: text, images, audio, PDF, plain text and sampled video frames through Gemma 4 E2B. Video audio-track analysis is not included yet. Output: model text plus device text-to-speech.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                    Text("Input: text, images, audio normalized to mono 16 kHz WAV, PDF pages and sampled video frames plus separately extracted audio through Gemma 4 E2B. Output: model text plus Android text-to-speech. LFM3-Omni and MiniCPM-V downloads are available, but their Android inference adapters are still pending.", style = MaterialTheme.typography.bodySmall, color = Muted)
                 }
             },
             confirmButton = { TextButton(onClick = { infoDialog = false }) { Text("Close") } },
