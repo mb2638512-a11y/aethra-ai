@@ -10,12 +10,13 @@ A local-first native Android AI workspace. The goal is to combine private on-dev
 - Dark AETHRA chat interface and model catalogue.
 - Local chat history persisted in app-private storage.
 - Three model candidates with upstream artifact, runtime and memory metadata.
-- LiteRT-LM Android dependency and a coroutine-based Gemma 4 E2B inference-session adapter.
+- LiteRT-LM Android dependency and a coroutine-based Gemma 4 E2B inference-session adapter, wired to the chat composer for streaming responses and cancellation.
+- Android DownloadManager-based model downloads for all three catalogue entries, including the Gemma artifact SHA-256 reference and progress/cancel UI.
 - GitHub Actions workflow that builds and uploads a debug APK.
 
 ## Not yet complete
 
-The Gemma adapter is not yet wired to the chat screen and its model download manager is not implemented. LFM3-Omni-2B and MiniCPM-V 4.6 still need llama.cpp Android integration. Also outstanding: multiple conversation management, verified model downloads, image/file import, PDF parsing, camera, microphone, speech output, video processing, online provider settings, export/share, and physical-device performance testing.
+Gemma inference and the model-download UI are implemented in source, but the latest Android build must pass before this revision can be distributed. Gemma still needs physical-device inference validation and completed-file checksum enforcement. LFM3-Omni-2B and MiniCPM-V 4.6 can be downloaded from their official repositories, but still need llama.cpp Android inference integration. Also outstanding: multiple conversation management, verified model downloads, image/file import, PDF parsing, camera, microphone, speech output, video processing, online provider settings, export/share, and physical-device performance testing.
 
 The app must not simulate AI output. Until a real model is installed and loaded, it must clearly report that inference is unavailable.
 
