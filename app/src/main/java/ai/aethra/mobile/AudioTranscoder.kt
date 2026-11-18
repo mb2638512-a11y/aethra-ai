@@ -19,7 +19,7 @@ import java.nio.ByteOrder
  * never held in memory. The source duration is bounded by the caller.
  */
 object AudioTranscoder {
-    private const val TARGET_SAMPLE_RATE = 16_000
+    private const val TARGET_SAMPLE_RATE = PcmWavFormat.SAMPLE_RATE
 
     fun toMono16KhzWav(context: Context, uri: Uri, maxSeconds: Int, prefix: String = "aethra_audio_"): File {
         val raw = File.createTempFile("${prefix}raw_", ".pcm", context.cacheDir)
@@ -165,27 +165,7 @@ object AudioTranscoder {
     }
 
     private fun writeWavHeader(output: FileOutputStream, dataBytes: Int) {
-        fun writeAscii(value: String) = output.write(value.toByteArray(Charsets.US_ASCII))
-        fun write16(value: Int) { output.write(value and 0xff); output.write((value shr 8) and 0xff) }
-        fun write32(value: Int) {
-            output.write(value and 0xff)
-            output.write((value shr 8) and 0xff)
-            output.write((value shr 16) and 0xff)
-            output.write((value shr 24) and 0xff)
-        }
-        writeAscii("RIFF")
-        write32(36 + dataBytes)
-        writeAscii("WAVE")
-        writeAscii("fmt ")
-        write32(16)
-        write16(1)
-        write16(1)
-        write32(TARGET_SAMPLE_RATE)
-        write32(TARGET_SAMPLE_RATE * 2)
-        write16(2)
-        write16(16)
-        writeAscii("data")
-        write32(dataBytes)
+        output.write(PcmWavFormat.header(dataBytes))
     }
 
     private fun MediaFormat.getIntegerOrDefault(key: String, fallback: Int): Int =
