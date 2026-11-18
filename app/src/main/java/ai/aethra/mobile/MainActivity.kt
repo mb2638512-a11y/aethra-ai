@@ -100,6 +100,7 @@ private fun AethraChatScreen() {
     var selectedModel by remember { mutableStateOf("Select model") }
     var modelMenu by remember { mutableStateOf(false) }
     var infoDialog by remember { mutableStateOf(false) }
+    var showModelLibrary by remember { mutableStateOf(false) }
     val messages = remember {
         mutableStateListOf<ChatMessage>().apply { addAll(ChatHistoryStore.load(context)) }
     }
@@ -135,6 +136,11 @@ private fun AethraChatScreen() {
                                     onClick = { selectedModel = candidate.displayName; modelMenu = false }
                                 )
                             }
+                            HorizontalDivider()
+                            DropdownMenuItem(
+                                text = { Text("Model Library • downloads") },
+                                onClick = { showModelLibrary = true; modelMenu = false }
+                            )
                         }
                     }
                     IconButton(onClick = { messages.clear(); ChatHistoryStore.clear(context) }) {
@@ -186,7 +192,7 @@ private fun AethraChatScreen() {
                     }
                 }
                 Text(
-                    "Local-first workspace • Inference engine not connected",
+                    "Local-first workspace • Model runtime setup in progress",
                     Modifier.fillMaxWidth().padding(top = 8.dp),
                     color = Muted, fontSize = 10.sp
                 )
@@ -240,6 +246,10 @@ private fun AethraChatScreen() {
                 }
             }
         }
+    }
+
+    if (showModelLibrary) {
+        ModelLibraryDialog(onDismiss = { showModelLibrary = false })
     }
 
     if (infoDialog) {
