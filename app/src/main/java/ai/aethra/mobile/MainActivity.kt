@@ -531,7 +531,7 @@ private fun AethraChatScreen() {
                     TextButton(onClick = { showModelLibrary = true; infoDialog = false }) { Text("Model Library & Downloads") }
                     TextButton(onClick = { showSettings = true; infoDialog = false }) { Text("Runtime & Device Settings") }
                     TextButton(onClick = { messages.clear(); ChatHistoryStore.clear(context); infoDialog = false }) { Text("New Chat / Clear History") }
-                    Text("Input: text, file picker and device speech recognition. Output: text and device text-to-speech. Image/audio/video model inference is not yet wired to the active runtime.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                    Text("Input: text, images, audio, PDF, plain text and sampled video frames through Gemma 4 E2B. Video audio-track analysis is not included yet. Output: model text plus device text-to-speech.", style = MaterialTheme.typography.bodySmall, color = Muted)
                 }
             },
             confirmButton = { TextButton(onClick = { infoDialog = false }) { Text("Close") } },
