@@ -55,7 +55,7 @@ fun ModelSettingsDialog(onDismiss: () -> Unit) {
                 Text("Media processing limits", style = MaterialTheme.typography.titleSmall)
                 Text("Video frames per request: ${videoFrames.intValue}")
                 Slider(value = videoFrames.intValue.toFloat(), onValueChange = { videoFrames.intValue = it.toInt().coerceIn(1, 4) }, valueRange = 1f..4f, steps = 2)
-                Text("Video audio segment: ${videoAudioSeconds.intValue} seconds")
+                Text("Maximum audio duration per request: ${videoAudioSeconds.intValue} seconds")
                 Slider(value = videoAudioSeconds.intValue.toFloat(), onValueChange = { videoAudioSeconds.intValue = it.toInt().coerceIn(15, 180) }, valueRange = 15f..180f, steps = 10)
                 Text("PDF pages per request: ${pdfPages.intValue}")
                 Slider(value = pdfPages.intValue.toFloat(), onValueChange = { pdfPages.intValue = it.toInt().coerceIn(1, 4) }, valueRange = 1f..4f, steps = 2)
