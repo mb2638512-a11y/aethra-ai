@@ -81,7 +81,7 @@ object ModelRuntimeRegistry {
     fun adapterFor(modelId: String): RuntimeAdapterInfo? = adapters[modelId]
 
     fun isRunnableOnAndroid(modelId: String): Boolean =
-        adapters[modelId]?.validatedOnAndroid == true
+        adapters[modelId]?.integratedOnAndroid == true
 
     fun runnableModelIds(): Set<String> =
         adapters.filterValues { it.integratedOnAndroid }.keys
