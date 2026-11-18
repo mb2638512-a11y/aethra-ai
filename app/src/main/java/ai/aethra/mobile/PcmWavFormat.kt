@@ -4,7 +4,7 @@ package ai.aethra.mobile
 object PcmWavFormat {
     const val SAMPLE_RATE = 16_000
     const val CHANNELS = 1
-    const val BITS_PER_SAMPLE = 16
+    const val BITS_PER_SAMPLE = 32
     const val BLOCK_ALIGN = CHANNELS * BITS_PER_SAMPLE / 8
     const val BYTE_RATE = SAMPLE_RATE * BLOCK_ALIGN
 
@@ -30,7 +30,7 @@ object PcmWavFormat {
         ascii(8, "WAVE")
         ascii(12, "fmt ")
         littleEndian(16, 16)
-        littleEndianShort(20, 1)
+        littleEndianShort(20, 3)
         littleEndianShort(22, CHANNELS)
         littleEndian(24, SAMPLE_RATE)
         littleEndian(28, BYTE_RATE)
