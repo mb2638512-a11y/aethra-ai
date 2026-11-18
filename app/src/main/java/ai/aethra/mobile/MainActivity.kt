@@ -81,6 +81,11 @@ private fun availableChatModels(context: Context): List<ModelCandidate> {
     }
 }
 
+private fun modelFileFor(context: Context, candidate: ModelCandidate): File? {
+    val primaryAsset = ModelAssets.byModel[candidate.id]?.firstOrNull() ?: return null
+    return File(File(context.getExternalFilesDir(null), "models"), primaryAsset.fileName)
+}
+
 private fun modelMonogram(modelId: String): String = when (modelId) {
     "gemma-4-e2b" -> "G"
     "lfm3-omni-2b" -> "L"
@@ -156,7 +161,7 @@ private fun AethraChatScreen() {
         if (defaultModel != null && sessionState.value == null) {
             runCatching {
                 ModelExecutionPolicy.assertCanLoad(context, defaultModel.minimumRamGb ?: 6, 0.25)
-                val modelFile = File(context.getExternalFilesDir(null), "models/gemma-4-E2B-it.litertlm")
+                val modelFile = modelFileFor(context, defaultModel) ?: error("No model artifact manifest is available.")
                 LiteRtModelSession(modelFile.absolutePath).also { it.open() }
             }.onSuccess { sessionState.value = it }
         }
@@ -209,7 +214,7 @@ private fun AethraChatScreen() {
                                             sessionState.value = null
                                             try {
                                                 ModelExecutionPolicy.assertCanLoad(context, candidate.minimumRamGb ?: 6, 0.25)
-                                                val modelFile = File(context.getExternalFilesDir(null), "models/gemma-4-E2B-it.litertlm")
+                                                val modelFile = modelFileFor(context, candidate) ?: error("No model artifact manifest is available.")
                                                 val expectedHash = ModelAssets.byModel[candidate.id]?.firstOrNull()?.expectedSha256
                                                 if (expectedHash != null) {
                                                     val actualHash = withContext(Dispatchers.IO) { ModelDownloadManager(context).sha256(modelFile) }
