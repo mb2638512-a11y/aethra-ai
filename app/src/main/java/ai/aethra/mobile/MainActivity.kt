@@ -369,7 +369,12 @@ private fun AethraChatScreen() {
                                 jobState.value?.cancel()
                             } else if (selectedAttachment != null) {
                                 val attachment = selectedAttachment!!
-                                messages.add(ChatMessage("Attachment selected: ${attachment.name} (${attachment.mimeType ?: "unknown type"}). The current Gemma adapter is text-only, so this file is not yet passed into model inference. Multimodal runtime integration is still in progress.", false))
+                                val modelId = ModelCatalogue.candidates.firstOrNull { it.displayName == selectedModel }?.id ?: "gemma-4-e2b"
+                                val inputCheck = MediaInputRouter.check(modelId, attachment.mimeType)
+                                messages.add(ChatMessage(
+                                    "Attachment: ${attachment.name} (${attachment.mimeType ?: "unknown type"}). ${inputCheck.explanation} The file has not been sent to model inference.",
+                                    false
+                                ))
                                 selectedAttachment = null
                             } else if (prompt.isNotBlank()) {
                                 val requestText = prompt.trim()
