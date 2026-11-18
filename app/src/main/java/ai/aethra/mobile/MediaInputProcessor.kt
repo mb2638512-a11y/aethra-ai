@@ -3,7 +3,6 @@ package ai.aethra.mobile
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.graphics.pdf.PdfRenderer
 import android.media.MediaMetadataRetriever
 import android.net.Uri
@@ -45,7 +44,7 @@ object MediaInputProcessor {
         when {
             mimeType?.startsWith("image/") == true -> {
                 if (prompt.isBlank()) contents += Content.Text("Describe this image in detail.")
-                val file = copyToCache(context, uri, extensionFor(mimeType))
+                val file = stageImage(context, uri)
                 files += file
                 contents += Content.ImageFile(file.absolutePath)
                 note = "Image attached for visual analysis."
@@ -83,6 +82,26 @@ object MediaInputProcessor {
         }
         check(contents.isNotEmpty()) { "No model input was prepared." }
         PreparedMediaInput(Contents.of(*contents.toTypedArray()), files, note)
+    }
+
+    private fun stageImage(context: Context, uri: Uri): File {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            ?: error("Could not inspect selected image.")
+        var sample = 1
+        while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 1600) sample *= 2
+        val options = BitmapFactory.Options().apply { inSampleSize = sample }
+        val decoded = context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
+            ?: error("Could not decode selected image.")
+        val scale = minOf(1f, 1600f / maxOf(decoded.width, decoded.height).toFloat())
+        val resized = if (scale < 1f) Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true) else decoded
+        val file = File.createTempFile("aethra_image_", ".jpg", context.cacheDir)
+        FileOutputStream(file).use { output ->
+            check(resized.compress(Bitmap.CompressFormat.JPEG, 88, output)) { "Could not encode selected image." }
+        }
+        if (resized !== decoded) resized.recycle()
+        decoded.recycle()
+        return file
     }
 
     private fun copyToCache(context: Context, uri: Uri, extension: String): File {
