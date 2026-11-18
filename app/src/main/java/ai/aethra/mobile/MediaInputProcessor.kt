@@ -114,11 +114,16 @@ object MediaInputProcessor {
 
     private fun copyToCache(context: Context, uri: Uri, extension: String): File {
         val output = File.createTempFile("aethra_input_", ".$extension", context.cacheDir)
-        context.contentResolver.openInputStream(uri)?.use { input ->
-            FileOutputStream(output).use { destination -> input.copyTo(destination) }
-        } ?: error("Could not open selected media file.")
-        check(output.length() > 0L) { "Selected media file is empty." }
-        return output
+        try {
+            context.contentResolver.openInputStream(uri)?.use { input ->
+                FileOutputStream(output).use { destination -> input.copyTo(destination) }
+            } ?: error("Could not open selected media file.")
+            check(output.length() > 0L) { "Selected media file is empty." }
+            return output
+        } catch (error: Throwable) {
+            output.delete()
+            throw error
+        }
     }
 
     private fun extractVideoFrames(context: Context, uri: Uri, maxFrames: Int): List<File> {
@@ -137,6 +142,9 @@ object MediaInputProcessor {
                 bitmap.recycle()
                 output += file
             }
+        } catch (error: Throwable) {
+            output.forEach { it.delete() }
+            throw error
         } finally {
             retriever.release()
         }
@@ -147,25 +155,33 @@ object MediaInputProcessor {
         val descriptor: ParcelFileDescriptor = context.contentResolver.openFileDescriptor(uri, "r")
             ?: error("Could not open this PDF.")
         val output = mutableListOf<File>()
-        descriptor.use { fd ->
-            PdfRenderer(fd).use { renderer ->
-                val pageCount = minOf(renderer.pageCount, maxPages)
-                for (index in 0 until pageCount) {
-                    renderer.openPage(index).use { page ->
-                        val scale = minOf(1.0, 1400.0 / maxOf(page.width, page.height))
-                        val width = (page.width * scale).toInt().coerceAtLeast(1)
-                        val height = (page.height * scale).toInt().coerceAtLeast(1)
-                        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                        page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        val file = File.createTempFile("aethra_pdf_page_", ".jpg", context.cacheDir)
-                        FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.JPEG, 88, it) }
-                        bitmap.recycle()
-                        output += file
+        try {
+            descriptor.use { fd ->
+                PdfRenderer(fd).use { renderer ->
+                    val pageCount = minOf(renderer.pageCount, maxPages)
+                    for (index in 0 until pageCount) {
+                        renderer.openPage(index).use { page ->
+                            val scale = minOf(1.0, 1400.0 / maxOf(page.width, page.height))
+                            val width = (page.width * scale).toInt().coerceAtLeast(1)
+                            val height = (page.height * scale).toInt().coerceAtLeast(1)
+                            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                            try {
+                                page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+                                val file = File.createTempFile("aethra_pdf_page_", ".jpg", context.cacheDir)
+                                FileOutputStream(file).use { check(bitmap.compress(Bitmap.CompressFormat.JPEG, 88, it)) }
+                                output += file
+                            } finally {
+                                bitmap.recycle()
+                            }
+                        }
                     }
                 }
             }
+            return output
+        } catch (error: Throwable) {
+            output.forEach { it.delete() }
+            throw error
         }
-        return output
     }
 
     private fun extensionFor(mime: String): String = when (mime.lowercase()) {
