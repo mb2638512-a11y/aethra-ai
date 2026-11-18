@@ -13,10 +13,7 @@ object MediaInputRouter {
         mimeType.startsWith("image/") -> ModelModality.IMAGE
         mimeType.startsWith("audio/") -> ModelModality.AUDIO
         mimeType.startsWith("video/") -> ModelModality.VIDEO
-        mimeType == "application/pdf" ||
-            mimeType.startsWith("text/") ||
-            mimeType.contains("wordprocessingml") ||
-            mimeType.contains("spreadsheet") -> ModelModality.DOCUMENT
+        mimeType == "application/pdf" || mimeType.startsWith("text/") -> ModelModality.DOCUMENT
         else -> null
     }
 
