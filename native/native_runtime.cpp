@@ -269,7 +269,6 @@ std::string generate_locked(const std::string & prompt,
         throw std::runtime_error("No GGUF model is loaded.");
     }
 
-    g_cancelled.store(false);
     const std::string formatted_prompt = format_user_prompt(prompt);
     evaluate_prompt(formatted_prompt, media_paths);
 
@@ -419,6 +418,7 @@ extern "C" JNIEXPORT jstring JNICALL
 Java_ai_aethra_mobile_NativeGgufRuntime_nativeGenerate(
     JNIEnv * env, jobject, jstring prompt, jobjectArray media_paths, jint max_tokens
 ) {
+    g_cancelled.store(false);
     std::lock_guard<std::mutex> lock(g_runtime_mutex);
     try {
         const std::string prompt_text = from_java(env, prompt);
@@ -445,6 +445,7 @@ extern "C" JNIEXPORT void JNICALL
 Java_ai_aethra_mobile_NativeGgufRuntime_nativeGenerateStream(
     JNIEnv * env, jobject, jstring prompt, jobjectArray media_paths, jint max_tokens, jobject callback
 ) {
+    g_cancelled.store(false);
     std::lock_guard<std::mutex> lock(g_runtime_mutex);
     try {
         if (callback == nullptr) throw std::runtime_error("A token callback is required.");
