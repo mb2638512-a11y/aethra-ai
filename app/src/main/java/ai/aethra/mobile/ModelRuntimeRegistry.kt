@@ -75,6 +75,8 @@ object ModelRuntimeRegistry {
         "gemma-4-e2b" to RuntimeAdapterInfo("LiteRT-LM Android", setOf(ModelModality.TEXT, ModelModality.IMAGE, ModelModality.AUDIO, ModelModality.VIDEO, ModelModality.DOCUMENT), text, true)
     )
 
+    fun allCapabilityModelIds(): Set<String> = capabilities.keys
+
     fun capabilitiesFor(modelId: String): ModelCapabilities =
         capabilities[modelId] ?: ModelCapabilities(text, text, "Capabilities have not been verified.")
 
