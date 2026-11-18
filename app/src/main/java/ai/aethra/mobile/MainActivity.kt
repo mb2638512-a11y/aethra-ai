@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Stop
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -127,6 +128,7 @@ private fun AethraChatScreen() {
     var selectedModel by remember { mutableStateOf(availableChatModels(context).firstOrNull()?.displayName ?: "No model installed") }
     var modelMenu by remember { mutableStateOf(false) }
     var infoDialog by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
     var showModelLibrary by remember { mutableStateOf(false) }
     var generating by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
@@ -196,6 +198,9 @@ private fun AethraChatScreen() {
                                 onClick = { showModelLibrary = true; modelMenu = false }
                             )
                         }
+                    }
+                    IconButton(onClick = { showSettings = true }) {
+                        Icon(Icons.Default.Settings, contentDescription = "Performance settings", tint = Color.White)
                     }
                     IconButton(onClick = { messages.clear(); ChatHistoryStore.clear(context) }) {
                         Icon(Icons.Default.Add, contentDescription = "New chat", tint = Color.White)
@@ -362,6 +367,10 @@ private fun AethraChatScreen() {
 
     if (showModelLibrary) {
         ModelLibraryDialog(onDismiss = { showModelLibrary = false })
+    }
+
+    if (showSettings) {
+        ModelSettingsDialog(onDismiss = { showSettings = false })
     }
 
     if (infoDialog) {
