@@ -261,7 +261,10 @@ void evaluate_prompt(const std::string & prompt, const std::vector<std::string> 
 
 std::string generate_locked(const std::string & prompt,
                             const std::vector<std::string> & media_paths,
-                            int max_tokens) {
+                            int max_tokens,
+                            JNIEnv * callback_env = nullptr,
+                            jobject callback = nullptr,
+                            jmethodID callback_method = nullptr) {
     if (g_model == nullptr || g_context == nullptr) {
         throw std::runtime_error("No GGUF model is loaded.");
     }
@@ -280,6 +283,17 @@ std::string generate_locked(const std::string & prompt,
 
     const llama_vocab * vocab = llama_model_get_vocab(g_model);
     std::string output;
+    auto emit_piece = [&](const char * data, int32_t size) {
+        if (size <= 0) return;
+        output.append(data, static_cast<size_t>(size));
+        if (callback_env != nullptr && callback != nullptr && callback_method != nullptr) {
+            jstring piece = to_java(callback_env, std::string(data, static_cast<size_t>(size)));
+            if (piece != nullptr) {
+                callback_env->CallVoidMethod(callback, callback_method, piece);
+                callback_env->DeleteLocalRef(piece);
+            }
+        }
+    };
     max_tokens = std::max(1, std::min(1024, max_tokens));
 
     try {
@@ -295,10 +309,12 @@ std::string generate_locked(const std::string & prompt,
                 piece_size = llama_token_to_piece(
                     vocab, token, expanded.data(), static_cast<int32_t>(expanded.size()), 0, false
                 );
-                if (piece_size > 0) output.append(expanded.data(), static_cast<size_t>(piece_size));
+                if (piece_size > 0) emit_piece(expanded.data(), piece_size);
             } else if (piece_size > 0) {
-                output.append(piece, static_cast<size_t>(piece_size));
+                emit_piece(piece, piece_size);
             }
+
+            if (callback_env != nullptr && callback_env->ExceptionCheck()) break;
 
             llama_batch batch = llama_batch_get_one(const_cast<llama_token *>(&token), 1);
             if (llama_decode(g_context, batch) != 0) {
@@ -393,6 +409,37 @@ Java_ai_aethra_mobile_NativeGgufRuntime_nativeGenerate(
         log_error(error.what());
         throw_illegal_state(env, error.what());
         return nullptr;
+    }
+}
+
+extern "C" JNIEXPORT void JNICALL
+Java_ai_aethra_mobile_NativeGgufRuntime_nativeGenerateStream(
+    JNIEnv * env, jobject, jstring prompt, jobjectArray media_paths, jint max_tokens, jobject callback
+) {
+    std::lock_guard<std::mutex> lock(g_runtime_mutex);
+    try {
+        if (callback == nullptr) throw std::runtime_error("A token callback is required.");
+        jclass callback_class = env->GetObjectClass(callback);
+        if (callback_class == nullptr) throw std::runtime_error("Could not resolve token callback class.");
+        jmethodID callback_method = env->GetMethodID(callback_class, "onToken", "(Ljava/lang/String;)V");
+        env->DeleteLocalRef(callback_class);
+        if (callback_method == nullptr) throw std::runtime_error("Token callback must expose onToken(String).");
+
+        const std::string prompt_text = from_java(env, prompt);
+        std::vector<std::string> paths;
+        if (media_paths != nullptr) {
+            const jsize count = env->GetArrayLength(media_paths);
+            paths.reserve(static_cast<size_t>(count));
+            for (jsize index = 0; index < count; ++index) {
+                auto item = static_cast<jstring>(env->GetObjectArrayElement(media_paths, index));
+                paths.push_back(from_java(env, item));
+                env->DeleteLocalRef(item);
+            }
+        }
+        generate_locked(prompt_text, paths, max_tokens, env, callback, callback_method);
+    } catch (const std::exception & error) {
+        log_error(error.what());
+        if (!env->ExceptionCheck()) throw_illegal_state(env, error.what());
     }
 }
 
