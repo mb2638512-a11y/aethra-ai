@@ -34,4 +34,21 @@ class ModelRuntimeRegistryTest {
         assertTrue(check.acceptedByModel)
         assertTrue(check.acceptedByAndroidRuntime)
     }
+
+    @Test
+    fun mediaMimeTypesRouteToExpectedModalities() {
+        assertEquals(ModelModality.IMAGE, MediaInputRouter.modalityForMime("image/jpeg"))
+        assertEquals(ModelModality.AUDIO, MediaInputRouter.modalityForMime("audio/mp4"))
+        assertEquals(ModelModality.VIDEO, MediaInputRouter.modalityForMime("video/mp4"))
+        assertEquals(ModelModality.DOCUMENT, MediaInputRouter.modalityForMime("application/pdf"))
+        assertEquals(ModelModality.DOCUMENT, MediaInputRouter.modalityForMime("text/plain"))
+        assertEquals(null, MediaInputRouter.modalityForMime("application/zip"))
+        assertEquals(null, MediaInputRouter.modalityForMime(null))
+    }
+
+    @Test
+    fun everyCatalogEntryHasExplicitCapabilityMetadata() {
+        val catalogueIds = ModelCatalogue.candidates.map { it.id }.toSet()
+        assertEquals(catalogueIds, ModelRuntimeRegistry.allCapabilityModelIds())
+    }
 }
