@@ -14,9 +14,10 @@ class ModelRuntimeRegistryTest {
         assertEquals("WAVE", String(header.copyOfRange(8, 12), Charsets.US_ASCII))
         assertEquals("fmt ", String(header.copyOfRange(12, 16), Charsets.US_ASCII))
         assertEquals(16_000, littleEndianInt(header, 24))
-        assertEquals(32_000, littleEndianInt(header, 28))
+        assertEquals(64_000, littleEndianInt(header, 28))
         assertEquals(1, littleEndianShort(header, 22))
-        assertEquals(16, littleEndianShort(header, 34))
+        assertEquals(3, littleEndianShort(header, 20))
+        assertEquals(32, littleEndianShort(header, 34))
         assertEquals(32000, littleEndianInt(header, 40))
     }
 
