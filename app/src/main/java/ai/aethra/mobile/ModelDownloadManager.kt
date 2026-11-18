@@ -76,25 +76,70 @@ object ModelAssets {
  * Uses Android's system DownloadManager so large model downloads can continue
  * outside the app process. Model files stay in the app-specific external folder.
  */
+object ModelDownloadReadiness {
+    /** Files on disk are not sufficient while DownloadManager may still be writing a partial artifact. */
+    fun isReady(filesPresent: Boolean, savedDownloadCount: Int, snapshots: List<DownloadSnapshot>): Boolean {
+        if (!filesPresent) return false
+        if (savedDownloadCount == 0) return true
+        return snapshots.size == savedDownloadCount &&
+            snapshots.all { it.status == DownloadManager.STATUS_SUCCESSFUL }
+    }
+}
+
+object ModelDownloadStore {
+    private const val PREFS = "aethra_model_downloads"
+    fun save(context: Context, modelId: String, ids: List<Long>) {
+        val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val editor = preferences.edit()
+        load(context, modelId).forEach { editor.remove("asset_$it") }
+        editor.putString(modelId, ids.joinToString(",")).apply()
+    }
+    fun load(context: Context, modelId: String): List<Long> =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(modelId, null)
+            ?.split(",")?.mapNotNull { it.toLongOrNull() }.orEmpty()
+    fun saveAssetName(context: Context, downloadId: Long, fileName: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString("asset_$downloadId", fileName).apply()
+    }
+    fun assetName(context: Context, downloadId: Long): String? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("asset_$downloadId", null)
+    fun clear(context: Context, modelId: String) {
+        val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val editor = preferences.edit().remove(modelId)
+        load(context, modelId).forEach { editor.remove("asset_$it") }
+        editor.apply()
+    }
+}
+
 class ModelDownloadManager(context: Context) {
     private val appContext = context.applicationContext
     private val manager = appContext.getSystemService(DownloadManager::class.java)
 
-    fun enqueueModel(modelId: String): List<Long> {
+    fun enqueueModel(modelId: String): List<Long> = enqueueMissingModel(modelId)
+
+    /** Enqueue only assets that are not already present, allowing failed/partial downloads to retry safely. */
+    fun enqueueMissingModel(modelId: String, retryFileNames: Set<String> = emptySet()): List<Long> {
         val assets = ModelAssets.byModel[modelId]
             ?: throw IllegalArgumentException("Unknown model: $modelId")
-        val destination = File(appContext.getExternalFilesDir(null), "models")
-        check(destination.exists() || destination.mkdirs()) { "Cannot create model directory." }
-
-        return assets.map { asset ->
+        val destination = modelDirectory()
+        retryFileNames.forEach { File(destination, it).delete() }
+        val missing = assets.filter { asset ->
+            val file = File(destination, asset.fileName)
+            !file.isFile || file.length() <= 0L
+        }
+        return missing.map { asset ->
+            val target = File(destination, asset.fileName)
+            target.delete()
             val request = DownloadManager.Request(Uri.parse(asset.url))
                 .setTitle("AETHRA AI • ${asset.fileName}")
                 .setDescription("Downloading model asset")
                 .setAllowedOverMetered(true)
                 .setAllowedOverRoaming(false)
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                .setDestinationUri(Uri.fromFile(File(destination, asset.fileName)))
-            manager.enqueue(request)
+                .setDestinationUri(Uri.fromFile(target))
+            manager.enqueue(request).also { downloadId ->
+                ModelDownloadStore.saveAssetName(appContext, downloadId, asset.fileName)
+            }
         }
     }
 
@@ -123,8 +168,27 @@ class ModelDownloadManager(context: Context) {
         if (downloadIds.isNotEmpty()) manager.remove(*downloadIds)
     }
 
+    fun cancelAndDeletePartial(downloadIds: List<Long>) {
+        cancel(*downloadIds.toLongArray())
+        downloadIds.mapNotNull { ModelDownloadStore.assetName(appContext, it) }
+            .forEach { File(modelDirectory(), it).delete() }
+    }
+
     fun modelDirectory(): File =
         File(appContext.getExternalFilesDir(null), "models").apply { mkdirs() }
+
+    fun deleteModelAssets(modelId: String): Int {
+        val assets = ModelAssets.byModel[modelId].orEmpty()
+        val ids = ModelDownloadStore.load(appContext, modelId)
+        cancel(*ids.toLongArray())
+        var deleted = 0
+        assets.forEach { asset ->
+            val file = File(modelDirectory(), asset.fileName)
+            if (file.exists() && file.delete()) deleted++
+        }
+        ModelDownloadStore.clear(appContext, modelId)
+        return deleted
+    }
 
     fun sha256(file: File): String {
         val digest = MessageDigest.getInstance("SHA-256")
