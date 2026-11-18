@@ -290,6 +290,7 @@ private fun AethraChatScreen() {
                                 onClick = {
                                     sessionState.value?.close()
                                     sessionState.value = null
+                                    selectedModel = "No model running"
                                     modelMenu = false
                                 }
                             )
