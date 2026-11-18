@@ -1,6 +1,7 @@
 package ai.aethra.mobile
 
 import android.os.Bundle
+import android.graphics.Bitmap
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.content.Intent
@@ -10,6 +11,7 @@ import java.util.Locale
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import java.io.File
+import java.io.FileOutputStream
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -36,6 +38,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -158,6 +161,20 @@ private fun AethraChatScreen() {
             runCatching { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }
             selectedAttachment = describeAttachment(context, uri)
             speechNotice = null
+        }
+    }
+    val cameraCapture = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicturePreview()
+    ) { bitmap ->
+        if (bitmap != null) {
+            runCatching {
+                val file = File.createTempFile("aethra_camera_", ".jpg", context.cacheDir)
+                FileOutputStream(file).use { output ->
+                    check(bitmap.compress(Bitmap.CompressFormat.JPEG, 90, output)) { "Could not save camera image." }
+                }
+                selectedAttachment = MediaAttachment(Uri.fromFile(file), "Camera capture.jpg", "image/jpeg")
+                speechNotice = "Camera image attached."
+            }.onFailure { speechNotice = it.message ?: "Camera capture failed." }
         }
     }
     val speechInput = rememberLauncherForActivityResult(
@@ -380,6 +397,9 @@ private fun AethraChatScreen() {
                             cursorColor = Violet
                         )
                     )
+                    IconButton(onClick = { runCatching { cameraCapture.launch(null) }.onFailure { speechNotice = "Camera is not available." } }) {
+                        Icon(Icons.Default.CameraAlt, contentDescription = "Capture image", tint = Muted)
+                    }
                     IconButton(onClick = {
                         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
                             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
