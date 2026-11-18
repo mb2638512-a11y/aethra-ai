@@ -11,7 +11,7 @@ A local-first native Android AI workspace. The goal is to combine private on-dev
 - Gemma 4 E2B LiteRT-LM session adapter with streamed text generation and cancellation.
 - Android DownloadManager-based model downloads for Gemma 4 E2B, LFM3-Omni-2B (GGUF + projector) and MiniCPM-V 4.6 (GGUF + projector).
 - Device readiness checks for RAM, free storage, low-memory state and thermal status.
-- User-configurable media preprocessing limits: 1–4 video frames, 1–4 PDF pages and 768–2048 px maximum image dimension.
+- User-configurable media preprocessing limits: 1–4 video frames, 1–4 PDF pages, 5–30 seconds of audio and 768–2048 px maximum image dimension.
 - Single-active-model policy; Run selector is gated by the Android runtime registry and locally available model assets.
 - Model catalogue search and category filtering, with explicit input/output modality labels.
 - System speech recognition as voice-to-text input, plus in-app microphone recording as an audio-file attachment (runtime permission requested on demand).
@@ -25,7 +25,7 @@ A local-first native Android AI workspace. The goal is to combine private on-dev
 
 ## Important runtime boundaries
 
-Gemma 4 E2B uses LiteRT-LM vision and audio inputs. The app now stages image/audio files, samples up to four frames from video, renders up to four PDF pages, and reads plain-text documents before sending supported content to the model. Video is represented as sampled frames only; its audio track is not included yet. Physical-device validation is still required.
+Gemma 4 E2B uses LiteRT-LM vision and audio inputs. The app stages images, decodes imported or video soundtrack audio through Android MediaCodec, normalizes audio to mono 16 kHz IEEE float32 WAV (Gemma audio is capped at 30 seconds), samples up to four video frames, renders up to four PDF pages, and reads plain-text documents. Video frames and its extracted soundtrack are attached as separate model inputs, not as one synchronized native video stream. Physical-device validation is still required.
 
 The model catalogue describes each model's expected input/output modalities. A catalogue entry or downloaded weight file does not mean that an Android runtime is integrated. At present, Gemma 4 E2B is the only model registered as runnable in the Android app. LFM3-Omni-2B and MiniCPM-V 4.6 still need the native llama.cpp Android integration and multimodal projector support. The image, audio and video generation workflows need their own dedicated runtimes and component dependencies.
 
@@ -35,9 +35,9 @@ Android system TextToSpeech and speech recognition are device services, not a lo
 
 - Native llama.cpp Android build and JNI bridge, including multimodal libmtmd support for LFM3-Omni and MiniCPM-V.
 - Actual LFM3-Omni-2B text/image/audio/video inference and MiniCPM-V vision inference.
-- Media preprocessing: image scaling, audio decoding/transcription, video frame/audio sampling, PDF text extraction and document chunking.
+- Media preprocessing improvements: image scaling/metadata, model-native synchronized video/audio handling, PDF text extraction and document chunking.
 - Dedicated image-generation/editing, audio-generation/TTS model adapters, and video-generation pipelines.
-- Integrity verification for every downloaded artifact, resumable/retryable downloads, storage cleanup and explicit download state recovery.
+- Extend artifact integrity verification to every model/projector file, plus storage cleanup and explicit download state recovery.
 - Multiple chats, export/share, camera capture, full audio recording controls and media-aware conversation history.
 - Physical-device testing for model load, inference, offline use, cancellation, model switching, thermal throttling and memory pressure.
 
