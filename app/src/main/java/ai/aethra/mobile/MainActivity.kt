@@ -1,6 +1,10 @@
 package ai.aethra.mobile
 
 import android.os.Bundle
+import java.io.File
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
@@ -19,6 +23,7 @@ import androidx.compose.material.icons.filled.ArrowUpward
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -101,6 +106,18 @@ private fun AethraChatScreen() {
     var modelMenu by remember { mutableStateOf(false) }
     var infoDialog by remember { mutableStateOf(false) }
     var showModelLibrary by remember { mutableStateOf(false) }
+    var generating by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+    val sessionState = remember { mutableStateOf<LiteRtModelSession?>(null) }
+    val jobState = remember { mutableStateOf<Job?>(null) }
+
+    DisposableEffect(Unit) {
+        onDispose {
+            jobState.value?.cancel()
+            sessionState.value?.close()
+            sessionState.value = null
+        }
+    }
     val messages = remember {
         mutableStateListOf<ChatMessage>().apply { addAll(ChatHistoryStore.load(context)) }
     }
@@ -181,18 +198,67 @@ private fun AethraChatScreen() {
                     }
                     IconButton(
                         onClick = {
-                            if (prompt.isNotBlank()) {
-                                messages.add(ChatMessage(prompt.trim(), true))
+                            if (generating) {
+                                jobState.value?.cancel()
+                            } else if (prompt.isNotBlank()) {
+                                val requestText = prompt.trim()
+                                messages.add(ChatMessage(requestText, true))
                                 prompt = ""
+                                jobState.value = scope.launch {
+                                    generating = true
+                                    val responseIndex = messages.size
+                                    messages.add(ChatMessage("", false))
+                                    try {
+                                        val candidate = ModelCatalogue.candidates.firstOrNull { it.displayName == selectedModel }
+                                        if (candidate?.id != "gemma-4-e2b") {
+                                            messages[responseIndex] = ChatMessage(
+                                                "This model's Android inference runtime is not connected yet. Gemma 4 E2B is the first integrated runtime target.",
+                                                false
+                                            )
+                                        } else {
+                                            val modelFile = File(context.getExternalFilesDir(null), "models/gemma-4-E2B-it.litertlm")
+                                            if (!modelFile.exists()) {
+                                                messages[responseIndex] = ChatMessage(
+                                                    "Gemma 4 E2B is not downloaded yet. Open Model Library and download it first.",
+                                                    false
+                                                )
+                                            } else {
+                                                var session = sessionState.value
+                                                if (session == null) {
+                                                    session = LiteRtModelSession(modelFile.absolutePath)
+                                                    session.open()
+                                                    sessionState.value = session
+                                                }
+                                                session.generate(requestText).collect { chunk ->
+                                                    val current = messages[responseIndex]
+                                                    messages[responseIndex] = current.copy(text = current.text + chunk)
+                                                }
+                                            }
+                                        }
+                                    } catch (error: Throwable) {
+                                        if (error is CancellationException) throw error
+                                        messages[responseIndex] = ChatMessage(
+                                            "Model error: ${error.message ?: "unknown inference failure"}",
+                                            false
+                                        )
+                                    } finally {
+                                        generating = false
+                                        jobState.value = null
+                                    }
+                                }
                             }
                         },
                         modifier = Modifier.background(Violet, CircleShape).size(42.dp)
                     ) {
-                        Icon(Icons.Default.ArrowUpward, contentDescription = "Send", tint = Night)
+                        Icon(
+                            if (generating) Icons.Default.Stop else Icons.Default.ArrowUpward,
+                            contentDescription = if (generating) "Stop generation" else "Send",
+                            tint = Night
+                        )
                     }
                 }
                 Text(
-                    "Local-first workspace • Model runtime setup in progress",
+                    "Local-first • Gemma 4 E2B runs on-device when installed",
                     Modifier.fillMaxWidth().padding(top = 8.dp),
                     color = Muted, fontSize = 10.sp
                 )
