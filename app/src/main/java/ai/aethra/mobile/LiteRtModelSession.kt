@@ -47,7 +47,7 @@ class LiteRtModelSession(
         val activeConversation = conversation
             ?: error("Model is not loaded. Open the session first.")
         activeConversation.sendMessageAsync(prompt).collect { message ->
-            emit(message.text)
+            emit(message.toString())
         }
     }.flowOn(Dispatchers.IO)
 
