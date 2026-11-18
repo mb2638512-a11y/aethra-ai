@@ -41,6 +41,7 @@ fun ModelLibraryDialog(onDismiss: () -> Unit) {
     var showSettings by remember { androidx.compose.runtime.mutableStateOf(false) }
     var searchQuery by remember { androidx.compose.runtime.mutableStateOf("") }
     var selectedCategory by remember { androidx.compose.runtime.mutableStateOf("All") }
+    var categoryMenu by remember { androidx.compose.runtime.mutableStateOf(false) }
     val categories = listOf("All") + ModelCatalogue.candidates.map { it.category }.distinct().sorted()
 
     LaunchedEffect(Unit) {
@@ -74,10 +75,11 @@ fun ModelLibraryDialog(onDismiss: () -> Unit) {
                     singleLine = true,
                     label = { Text("Search models and workflows") }
                 )
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    categories.take(4).forEach { category ->
-                        TextButton(onClick = { selectedCategory = category }) {
-                            Text(if (selectedCategory == category) "• " + category else category)
+                Box {
+                    TextButton(onClick = { categoryMenu = true }) { Text("Category: " + selectedCategory) }
+                    DropdownMenu(expanded = categoryMenu, onDismissRequest = { categoryMenu = false }) {
+                        categories.forEach { category ->
+                            DropdownMenuItem(text = { Text(category) }, onClick = { selectedCategory = category; categoryMenu = false })
                         }
                     }
                 }
