@@ -89,12 +89,16 @@ fun ModelLibraryDialog(onDismiss: () -> Unit) {
                             Text(model.displayName, style = MaterialTheme.typography.titleMedium)
                             Text(model.category.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             Text(model.purpose, style = MaterialTheme.typography.bodySmall)
+                            val capabilities = ModelRuntimeRegistry.capabilitiesFor(model.id)
+                            Text("Input: " + capabilities.inputs.joinToString(" • ") { it.label }, style = MaterialTheme.typography.bodySmall)
+                            Text("Output: " + capabilities.outputs.joinToString(" • ") { it.label }, style = MaterialTheme.typography.bodySmall)
                             Text("Runtime: ${model.runtime}", style = MaterialTheme.typography.bodySmall)
                             Text(
-                                if (model.id == "gemma-4-e2b") "Android runtime integrated" else "Catalogue/download entry • Android runtime pending",
+                                if (ModelRuntimeRegistry.isRunnableOnAndroid(model.id)) "Android runtime integrated and enabled" else "Catalogue/download entry • Android runtime pending",
                                 style = MaterialTheme.typography.labelSmall,
-                                color = if (model.id == "gemma-4-e2b") MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
+                                color = if (ModelRuntimeRegistry.isRunnableOnAndroid(model.id)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.secondary
                             )
+                            Text(capabilities.notes, style = MaterialTheme.typography.bodySmall)
                             Text("Package: ${model.approximateDownload}", style = MaterialTheme.typography.bodySmall)
                             Text(
                                 "RAM guidance: ${model.minimumRamGb?.let { "at least ${it} GB" } ?: "not independently specified"}",
