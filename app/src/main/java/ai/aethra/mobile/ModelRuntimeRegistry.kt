@@ -18,14 +18,14 @@ data class RuntimeAdapterInfo(
     val runtimeName: String,
     val supportedInputs: Set<ModelModality>,
     val supportedOutputs: Set<ModelModality>,
-    val validatedOnAndroid: Boolean,
+    val integratedOnAndroid: Boolean,
 )
 
 /**
  * Central capability and adapter registry.
  *
  * Catalogue capability is descriptive metadata. A model is runnable only when an actual
- * Android adapter is registered and marked validated. Do not infer runnability from weights
+ * Android adapter is registered and integrated with a real Android adapter. Do not infer runnability from weights
  * being downloaded.
  */
 object ModelRuntimeRegistry {
@@ -86,5 +86,5 @@ object ModelRuntimeRegistry {
         adapters[modelId]?.validatedOnAndroid == true
 
     fun runnableModelIds(): Set<String> =
-        adapters.filterValues { it.validatedOnAndroid }.keys
+        adapters.filterValues { it.integratedOnAndroid }.keys
 }
