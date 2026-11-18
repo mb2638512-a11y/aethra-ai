@@ -18,6 +18,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -38,6 +39,9 @@ fun ModelLibraryDialog(onDismiss: () -> Unit) {
     val activeDownloads = remember { mutableStateMapOf<String, List<Long>>() }
     val snapshots = remember { mutableStateMapOf<Long, DownloadSnapshot>() }
     var showSettings by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var searchQuery by remember { androidx.compose.runtime.mutableStateOf("") }
+    var selectedCategory by remember { androidx.compose.runtime.mutableStateOf("All") }
+    val categories = listOf("All") + ModelCatalogue.candidates.map { it.category }.distinct().sorted()
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -63,7 +67,28 @@ fun ModelLibraryDialog(onDismiss: () -> Unit) {
                 OutlinedButton(onClick = { showSettings = true }, modifier = Modifier.fillMaxWidth()) {
                     Text("Device & performance settings")
                 }
-                ModelCatalogue.candidates.forEach { model ->
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    label = { Text("Search models and workflows") }
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    categories.take(4).forEach { category ->
+                        TextButton(onClick = { selectedCategory = category }) {
+                            Text(if (selectedCategory == category) "• " + category else category)
+                        }
+                    }
+                }
+                ModelCatalogue.candidates.filter { model ->
+                    val matchesQuery = searchQuery.isBlank() ||
+                        model.displayName.contains(searchQuery, ignoreCase = true) ||
+                        model.purpose.contains(searchQuery, ignoreCase = true) ||
+                        model.category.contains(searchQuery, ignoreCase = true)
+                    val matchesCategory = selectedCategory == "All" || model.category == selectedCategory
+                    matchesQuery && matchesCategory
+                }.forEach { model ->
                     val assets = ModelAssets.byModel[model.id].orEmpty()
                     val ids = activeDownloads[model.id].orEmpty()
                     val modelSnapshots = ids.mapNotNull { snapshots[it] }
