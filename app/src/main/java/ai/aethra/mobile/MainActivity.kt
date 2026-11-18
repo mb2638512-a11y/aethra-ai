@@ -651,6 +651,16 @@ private fun AethraChatScreen() {
                         messages.add(ChatMessage("Model not started: ${error.message ?: "device check failed"}", false))
                     }
                 }
+            },
+            onDeleteModel = { candidate ->
+                if (selectedModel == candidate.displayName) {
+                    jobState.value?.cancel()
+                    sessionState.value?.close()
+                    sessionState.value = null
+                    selectedModel = "No model running"
+                }
+                val deleted = ModelDownloadManager(context).deleteModelAssets(candidate.id)
+                messages.add(ChatMessage("Removed $deleted local model file(s) for ${candidate.displayName}.", false))
             }
         )
     }
