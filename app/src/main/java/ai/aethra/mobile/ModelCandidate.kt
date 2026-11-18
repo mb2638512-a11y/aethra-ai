@@ -1,8 +1,8 @@
 package ai.aethra.mobile
 
 /**
- * Verified model metadata. "Catalogue" means available for selection/download;
- * it does not mean that the model has been installed or tested on this device.
+ * Catalogue entries describe models/workflows; they do not imply the weights are downloaded,
+ * the runtime is integrated, or the device has passed a compatibility test.
  */
 data class ModelCandidate(
     val id: String,
@@ -15,50 +15,38 @@ data class ModelCandidate(
     val minimumRamGb: Int? = null,
     val officialModelUrl: String,
     val notes: String,
+    val category: String = "Multimodal",
 )
 
 enum class ModelStatus {
-    CATALOG_ONLY,
-    DOWNLOADING,
-    DOWNLOADED,
-    LOADING,
-    LOADED,
-    ERROR
+    CATALOG_ONLY, DOWNLOADING, DOWNLOADED, LOADING, LOADED, ERROR
 }
 
 object ModelCatalogue {
     val candidates = listOf(
-        ModelCandidate(
-            id = "lfm3-omni-2b",
-            displayName = "LFM3-Omni-2B",
-            purpose = "Text, image, audio and video understanding; speech output",
-            runtime = "llama.cpp Android (GGUF + multimodal projector)",
-            artifactFormat = "GGUF Q4_K_M + mmproj Q4_K_M",
-            approximateDownload = "1.1 GB + 292 MB",
-            officialModelUrl = "https://huggingface.co/LiquidAI/LFM3-Omni-2B-GGUF",
-            notes = "Official GGUF card documents llama.cpp support. Android integration and modality parity still require device validation.",
-        ),
-        ModelCandidate(
-            id = "gemma-4-e2b",
-            displayName = "Gemma 4 E2B",
-            purpose = "General-purpose assistant; text and supported multimodal inputs",
-            runtime = "LiteRT-LM Android",
-            artifactFormat = "litertlm",
-            approximateDownload = "About 2.58 GB",
-            minimumRamGb = 8,
-            officialModelUrl = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm",
-            notes = "First runtime integration target. Published reference device requirement is 8 GB RAM; performance varies by phone.",
-        ),
-        ModelCandidate(
-            id = "minicpm-v-4-6",
-            displayName = "MiniCPM-V 4.6",
-            purpose = "Image, multi-image, video and document understanding",
-            runtime = "llama.cpp Android (GGUF + vision projector)",
-            artifactFormat = "GGUF Q4_K_M + mmproj",
-            approximateDownload = "About 1.6 GB total",
-            minimumRamGb = 6,
-            officialModelUrl = "https://huggingface.co/openbmb/MiniCPM-V-4.6-gguf",
-            notes = "Official deployment guide lists llama.cpp support and recommends at least 6 GB device RAM for the Q4 build.",
-        ),
+        ModelCandidate("gemma-4-e2b", "Gemma 4 E2B", "General assistant and supported multimodal inputs", runtime = "LiteRT-LM Android", artifactFormat = "litertlm", approximateDownload = "About 2.58 GB", minimumRamGb = 8, officialModelUrl = "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm", notes = "First integrated Android inference target. Must pass device memory checks.", category = "Chat & Multimodal"),
+        ModelCandidate("lfm3-omni-2b", "LFM3-Omni-2B", "Text, image, audio and video understanding; speech output", runtime = "llama.cpp Android + multimodal projector", artifactFormat = "GGUF Q4_K_M + mmproj", approximateDownload = "About 1.4 GB", officialModelUrl = "https://huggingface.co/LiquidAI/LFM3-Omni-2B-GGUF", notes = "GGUF files listed in Library; Android runtime integration and modality parity pending.", category = "Chat & Multimodal"),
+        ModelCandidate("minicpm-v-4-6", "MiniCPM-V 4.6", "Image, multi-image, video and document understanding", runtime = "llama.cpp Android + vision projector", artifactFormat = "GGUF Q4_K_M + mmproj", approximateDownload = "About 1.6 GB", minimumRamGb = 6, officialModelUrl = "https://huggingface.co/openbmb/MiniCPM-V-4.6-gguf", notes = "GGUF files listed in Library; Android runtime integration pending.", category = "Vision"),
+        ModelCandidate("qwen3-omni", "Qwen3-Omni", "Audio, image and video understanding; speech generation", runtime = "Transformers / dedicated multimodal runtime", artifactFormat = "Safetensors", approximateDownload = "Large multi-component package", minimumRamGb = 24, officialModelUrl = "https://huggingface.co/Qwen", notes = "Understanding and speech model, not a full image/video generator. Not mobile-ready.", category = "Audio & Multimodal"),
+        ModelCandidate("qwen3-vl-8b", "Qwen3-VL-8B", "High-quality image and video understanding", runtime = "llama.cpp / Transformers depending on conversion", artifactFormat = "GGUF or Safetensors variants", approximateDownload = "Several GB plus vision components", minimumRamGb = 12, officialModelUrl = "https://huggingface.co/Qwen", notes = "Vision-language model; generation of images/videos is not its purpose.", category = "Vision"),
+        ModelCandidate("qwen-image-2-1", "Qwen-Image-2.1", "Text-to-image generation and reference-guided image work", runtime = "ComfyUI / diffusion runtime", artifactFormat = "Safetensors", approximateDownload = "Multi-GB", minimumRamGb = 16, officialModelUrl = "https://huggingface.co/Qwen", notes = "Desktop-class diffusion workflow; not a GGUF chat model.", category = "Image"),
+        ModelCandidate("qwen-image-edit-20b", "Qwen Image Edit 20B", "Instruction-based image editing and reference consistency", runtime = "ComfyUI-GGUF / diffusion runtime", artifactFormat = "GGUF transformer + text encoder + VAE", approximateDownload = "13 GB+ transformer plus dependencies", minimumRamGb = 24, officialModelUrl = "https://huggingface.co/oracg/Qwen-Image-Edit-GGUF", notes = "GGUF conversion exists; full pipeline needs multiple components and substantial memory.", category = "Image Editing"),
+        ModelCandidate("flux-kontext-dev", "FLUX.1 Kontext Dev", "Reference-based image editing and character consistency", runtime = "ComfyUI-GGUF", artifactFormat = "GGUF + text encoders + VAE", approximateDownload = "12 GB+ with dependencies", minimumRamGb = 24, officialModelUrl = "https://huggingface.co/black-forest-labs/FLUX.1-Kontext-dev", notes = "Developer license is not unrestricted commercial use; review license before deployment.", category = "Image Editing"),
+        ModelCandidate("sd35-large", "Stable Diffusion 3.5 Large", "High-quality text-to-image generation", runtime = "ComfyUI / stable-diffusion.cpp", artifactFormat = "GGUF or Safetensors + encoders + VAE", approximateDownload = "Multi-GB", minimumRamGb = 16, officialModelUrl = "https://huggingface.co/stabilityai/stable-diffusion-3.5-large", notes = "Community license and component requirements apply.", category = "Image"),
+        ModelCandidate("wan22-ti2v-5b", "Wan 2.2 TI2V 5B", "Text-to-video and image-to-video", runtime = "ComfyUI-GGUF / stable-diffusion.cpp", artifactFormat = "GGUF transformer + UMT5 encoder + VAE", approximateDownload = "3 GB+ transformer; full pipeline larger", minimumRamGb = 24, officialModelUrl = "https://huggingface.co/QuantStack/Wan2.2-TI2V-5B-GGUF", notes = "Desktop GPU workflow; downloaded transformer alone is not a complete model pipeline.", category = "Video"),
+        ModelCandidate("hunyuan-video-13b", "HunyuanVideo 13B", "High-quality text-to-video generation", runtime = "ComfyUI-GGUF", artifactFormat = "GGUF + text encoder + VAE", approximateDownload = "8 GB+ transformer; full pipeline larger", minimumRamGb = 32, officialModelUrl = "https://huggingface.co/city96/HunyuanVideo-gguf", notes = "Very large desktop workflow; not suitable for ordinary Android phones.", category = "Video"),
+        ModelCandidate("ltx-25", "LTX-2.5", "Video generation with synchronized audio workflows", runtime = "ComfyUI / dedicated video runtime", artifactFormat = "Model-specific weights", approximateDownload = "Large multi-component package", minimumRamGb = 32, officialModelUrl = "https://huggingface.co/Lightricks", notes = "Check exact release weights and license; not a confirmed mobile GGUF runtime.", category = "Video & Audio"),
+        ModelCandidate("cogvideox-5b", "CogVideoX 5B", "Text-to-video and image-to-video", runtime = "Diffusers / ComfyUI", artifactFormat = "Safetensors", approximateDownload = "Multi-GB", minimumRamGb = 24, officialModelUrl = "https://huggingface.co/THUDM/CogVideoX-5b", notes = "Desktop-oriented generation pipeline.", category = "Video"),
+        ModelCandidate("wan21-1-3b", "Wan 2.1 1.3B", "Lightweight text-to-video research baseline", runtime = "Diffusers / ComfyUI", artifactFormat = "Safetensors", approximateDownload = "Multi-GB", minimumRamGb = 8, officialModelUrl = "https://huggingface.co/Wan-AI", notes = "Smaller than 5B video models but still needs a compatible pipeline and memory testing.", category = "Video"),
+        ModelCandidate("ace-step-1-5", "ACE-Step 1.5", "Local music and audio generation", runtime = "ACE-Step / acestep.cpp", artifactFormat = "GGUF/quantized components", approximateDownload = "Several GB across components", minimumRamGb = 16, officialModelUrl = "https://github.com/ace-step/ACE-Step", notes = "Audio generation pipeline; not an image/video generator.", category = "Audio"),
+        ModelCandidate("neutts", "NeuTTS", "Offline text-to-speech and consent-based voice cloning", runtime = "NeuTTS Android / ONNX decoder", artifactFormat = "GGUF backbone + ONNX codec", approximateDownload = "Model-dependent", minimumRamGb = 4, officialModelUrl = "https://github.com/neuphonic/neutts-android", notes = "Voice cloning must only use voices with permission.", category = "Audio"),
+        ModelCandidate("whisper-large-v3-turbo", "Whisper Large-v3 Turbo", "Speech recognition and transcription", runtime = "whisper.cpp Android", artifactFormat = "GGUF", approximateDownload = "About 1.6 GB quantized variants vary", minimumRamGb = 4, officialModelUrl = "https://huggingface.co/openai/whisper-large-v3-turbo", notes = "Audio understanding/transcription, not speech generation.", category = "Audio"),
+        ModelCandidate("kokoro-82m", "Kokoro 82M", "Fast local text-to-speech", runtime = "ONNX / Kokoro runtime", artifactFormat = "ONNX", approximateDownload = "Hundreds of MB including voices", minimumRamGb = 2, officialModelUrl = "https://huggingface.co/hexgrad/Kokoro-82M", notes = "Small speech synthesis model; device-specific voice package required.", category = "Audio"),
+        ModelCandidate("stable-audio-open", "Stable Audio Open", "Sound effects and short audio generation", runtime = "Diffusers / dedicated audio runtime", artifactFormat = "Safetensors", approximateDownload = "Multi-GB", minimumRamGb = 16, officialModelUrl = "https://huggingface.co/stabilityai/stable-audio-open-1.0", notes = "Review the model license and usage limits.", category = "Audio"),
+        ModelCandidate("sam3", "SAM 3", "Object segmentation and tracking for editing workflows", runtime = "PyTorch / ONNX-compatible pipeline", artifactFormat = "Safetensors", approximateDownload = "Multi-GB", minimumRamGb = 8, officialModelUrl = "https://github.com/facebookresearch/sam3", notes = "A supporting vision component, not a standalone character generator.", category = "Vision Tools"),
+        ModelCandidate("openjutsu", "Openjutsu Character Workflow", "Video character replacement and scene-consistent edits", runtime = "ComfyUI workflow + multiple models", artifactFormat = "Workflow, not one model file", approximateDownload = "Depends on selected components", minimumRamGb = 32, officialModelUrl = "https://github.com/D3voz/openjutsu", notes = "Workflow entry; character identity consistency depends on source quality and pipeline.", category = "Character Editing"),
+        ModelCandidate("facefusion", "FaceFusion", "Consent-based face replacement and restoration workflow", runtime = "FaceFusion + ONNX execution providers", artifactFormat = "Application and component models", approximateDownload = "Multiple components", minimumRamGb = 8, officialModelUrl = "https://github.com/facefusion/facefusion", notes = "Tool workflow, not a single GGUF model. Use only with the depicted person's consent.", category = "Character Editing"),
+        ModelCandidate("animatediff", "AnimateDiff", "Animate image-generation models into short videos", runtime = "ComfyUI / Diffusers", artifactFormat = "Motion module + base model", approximateDownload = "Multi-GB with base model", minimumRamGb = 8, officialModelUrl = "https://github.com/guoyww/AnimateDiff", notes = "Requires a compatible image model and motion module.", category = "Video"),
+        ModelCandidate("viggle-image-swap", "Viggle Image Swap", "Reference-based full-body character replacement in images", runtime = "Qwen Image editing workflow / LoRA", artifactFormat = "LoRA + base image model", approximateDownload = "Base model plus LoRA", minimumRamGb = 16, officialModelUrl = "https://huggingface.co/Viggle/Viggle-Image-Swap", notes = "Not standalone; exact identity and pose preservation vary by image.", category = "Character Editing")
     )
 }
