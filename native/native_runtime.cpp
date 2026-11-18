@@ -322,8 +322,9 @@ Java_ai_aethra_mobile_NativeGgufRuntime_nativeCancel(JNIEnv *, jobject) {
 
 extern "C" JNIEXPORT void JNICALL
 Java_ai_aethra_mobile_NativeGgufRuntime_nativeUnload(JNIEnv *, jobject) {
-    std::lock_guard<std::mutex> lock(g_runtime_mutex);
+    // Request cancellation before waiting for the generation mutex.
     g_cancelled.store(true);
+    std::lock_guard<std::mutex> lock(g_runtime_mutex);
     unload_locked();
 }
 
