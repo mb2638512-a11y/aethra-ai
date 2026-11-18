@@ -1,9 +1,10 @@
 package ai.aethra.mobile
 
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
-import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.Closeable
 import java.io.File
@@ -32,13 +33,26 @@ class NativeGgufModelSession(
         opened = true
     }
 
-    fun generate(prompt: String, mediaPaths: List<String> = emptyList()): Flow<String> = flow {
+    fun generate(prompt: String, mediaPaths: List<String> = emptyList()): Flow<String> = callbackFlow {
         check(opened) { "GGUF model is not loaded." }
-        val response = withContext(Dispatchers.IO) {
-            NativeGgufRuntime.nativeGenerate(prompt, mediaPaths.toTypedArray(), maxTokens.coerceIn(1, 1024))
+        val worker = launch(Dispatchers.IO) {
+            try {
+                NativeGgufRuntime.nativeGenerateStream(
+                    prompt,
+                    mediaPaths.toTypedArray(),
+                    maxTokens.coerceIn(1, 1024),
+                    NativeTokenCallback { token -> trySend(token) }
+                )
+                close()
+            } catch (error: Throwable) {
+                close(error)
+            }
         }
-        emit(response)
-    }.flowOn(Dispatchers.IO)
+        awaitClose {
+            NativeGgufRuntime.nativeCancel()
+            worker.cancel()
+        }
+    }
 
     fun cancel() {
         if (opened) NativeGgufRuntime.nativeCancel()
