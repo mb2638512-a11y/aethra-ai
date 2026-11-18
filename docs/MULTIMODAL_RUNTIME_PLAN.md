@@ -43,7 +43,7 @@ Settings may let users request a higher concurrency value, but the effective val
 
 ## Current verified implementation
 
-- Gemma 4 E2B: LiteRT-LM Kotlin adapter is configured with CPU, vision and audio backends. Text, image and audio inputs are routed into LiteRT-LM Content; video is sampled into up to four image frames; PDF pages are rendered into up to four images; plain-text documents are appended to the prompt. Video audio-track extraction is not implemented. Physical-device modality tests remain pending.
+- Gemma 4 E2B: LiteRT-LM Kotlin adapter is configured with CPU, vision and audio backends. Text, image and audio inputs are routed into LiteRT-LM Content; video is sampled into up to four image frames; PDF pages are rendered into up to four images; plain-text documents are appended to the prompt. Video soundtrack is separately extracted with MediaExtractor/MediaCodec and normalized to mono 16 kHz float32 WAV; audio input is capped at 30 seconds for Gemma 4. The video frames and soundtrack are separate parts rather than a synchronized native video token stream. Physical-device modality tests remain pending.
 - LFM3-Omni-2B: main GGUF and projector download manifest exists; Android llama.cpp/libmtmd runtime is not integrated.
 - MiniCPM-V 4.6: GGUF and projector download manifest exists; Android llama.cpp runtime is not integrated.
 - Image generation, audio generation and video generation: catalogue entries only; no dedicated Android generation pipeline is integrated. Android system TextToSpeech is available for reading text responses but is not a generative audio model.
@@ -53,7 +53,7 @@ Settings may let users request a higher concurrency value, but the effective val
 
 1. Fix model-path selection and lifecycle correctness.
 2. Add model state registry, integrity verification for every artifact, resumable downloads, cancellation and storage cleanup.
-3. Integrate a pinned llama.cpp Android build with GGUF + projector support and test LFM3-Omni text/image/audio/video inputs.
+3. Build pinned llama.cpp b11960 + libmtmd for Android arm64; then integrate the JNI adapter, GGUF + projector loading, and test LFM3-Omni text/image/audio plus synchronized video input.
 4. Add LiteRT-LM image/audio content paths only for a model bundle that documents those modalities.
 5. Add dedicated image, speech and video generation pipelines with explicit model dependencies.
 6. Add capability-driven composer, media previews, progress, export and settings.
