@@ -9,10 +9,9 @@ import android.net.Uri
 import java.io.File
 import java.io.FileOutputStream
 import java.io.RandomAccessFile
-import java.nio.ByteOrder
 
 /**
- * Decodes Android-supported compressed audio to the mono 16 kHz PCM WAV input
+ * Decodes Android-supported compressed audio to the mono 16 kHz float32 WAV input
  * expected by the current LiteRT-LM audio path.
  *
  * Decoding is streamed to a temporary raw PCM file; the full decoded track is
