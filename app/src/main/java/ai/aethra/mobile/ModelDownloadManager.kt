@@ -95,20 +95,27 @@ class ModelDownloadManager(context: Context) {
     private val appContext = context.applicationContext
     private val manager = appContext.getSystemService(DownloadManager::class.java)
 
-    fun enqueueModel(modelId: String): List<Long> {
+    fun enqueueModel(modelId: String): List<Long> = enqueueMissingModel(modelId)
+
+    /** Enqueue only assets that are not already present, allowing failed/partial downloads to retry safely. */
+    fun enqueueMissingModel(modelId: String): List<Long> {
         val assets = ModelAssets.byModel[modelId]
             ?: throw IllegalArgumentException("Unknown model: $modelId")
-        val destination = File(appContext.getExternalFilesDir(null), "models")
-        check(destination.exists() || destination.mkdirs()) { "Cannot create model directory." }
-
-        return assets.map { asset ->
+        val destination = modelDirectory()
+        val missing = assets.filter { asset ->
+            val file = File(destination, asset.fileName)
+            !file.isFile || file.length() <= 0L
+        }
+        return missing.map { asset ->
+            val target = File(destination, asset.fileName)
+            target.delete()
             val request = DownloadManager.Request(Uri.parse(asset.url))
                 .setTitle("AETHRA AI • ${asset.fileName}")
                 .setDescription("Downloading model asset")
                 .setAllowedOverMetered(true)
                 .setAllowedOverRoaming(false)
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                .setDestinationUri(Uri.fromFile(File(destination, asset.fileName)))
+                .setDestinationUri(Uri.fromFile(target))
             manager.enqueue(request)
         }
     }
