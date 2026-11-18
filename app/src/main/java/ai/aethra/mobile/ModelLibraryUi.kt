@@ -35,6 +35,7 @@ fun ModelLibraryDialog(onDismiss: () -> Unit) {
     val downloader = remember { ModelDownloadManager(context) }
     val activeDownloads = remember { mutableStateMapOf<String, List<Long>>() }
     val snapshots = remember { mutableStateMapOf<Long, DownloadSnapshot>() }
+    var showSettings by remember { androidx.compose.runtime.mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -54,9 +55,12 @@ fun ModelLibraryDialog(onDismiss: () -> Unit) {
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    "Model weights download separately from the APK and stay in AETHRA's app-specific storage. Large downloads may use several gigabytes.",
+                    "23 multimedia models and workflows are catalogued. Only entries with a verified download manifest can be downloaded here; only models with an integrated runtime and complete local files can appear in the Run selector.",
                     style = MaterialTheme.typography.bodySmall
                 )
+                OutlinedButton(onClick = { showSettings = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("Device & performance settings")
+                }
                 ModelCatalogue.candidates.forEach { model ->
                     val assets = ModelAssets.byModel[model.id].orEmpty()
                     val ids = activeDownloads[model.id].orEmpty()
@@ -77,6 +81,7 @@ fun ModelLibraryDialog(onDismiss: () -> Unit) {
                             verticalArrangement = Arrangement.spacedBy(7.dp)
                         ) {
                             Text(model.displayName, style = MaterialTheme.typography.titleMedium)
+                            Text(model.category.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
                             Text(model.purpose, style = MaterialTheme.typography.bodySmall)
                             Text("Runtime: ${model.runtime}", style = MaterialTheme.typography.bodySmall)
                             Text("Package: ${model.approximateDownload}", style = MaterialTheme.typography.bodySmall)
@@ -100,11 +105,21 @@ fun ModelLibraryDialog(onDismiss: () -> Unit) {
                                 Button(
                                     enabled = assets.isNotEmpty() && ids.isEmpty(),
                                     onClick = {
-                                        runCatching { downloader.enqueueModel(model.id) }
-                                            .onSuccess { activeDownloads[model.id] = it }
+                                        runCatching {
+                                            val device = ModelExecutionPolicy.inspect(context)
+                                            check(device.freeStorageGb >= 3.0) { "At least 3 GB free storage is required for this download." }
+                                            downloader.enqueueModel(model.id)
+                                        }.onSuccess { activeDownloads[model.id] = it }
                                     }
                                 ) {
-                                    Text(if (allDone) "Downloaded" else if (ids.isEmpty()) "Download" else "Queued")
+                                    Text(
+                                        when {
+                                            allDone -> "Downloaded"
+                                            assets.isEmpty() -> "Download integration pending"
+                                            ids.isEmpty() -> "Download"
+                                            else -> "Queued"
+                                        }
+                                    )
                                 }
                                 OutlinedButton(onClick = {
                                     context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(model.officialModelUrl)))
@@ -123,4 +138,8 @@ fun ModelLibraryDialog(onDismiss: () -> Unit) {
         },
         confirmButton = { TextButton(onClick = onDismiss) { Text("Close") } }
     )
+
+    if (showSettings) {
+        ModelSettingsDialog(onDismiss = { showSettings = false })
+    }
 }
