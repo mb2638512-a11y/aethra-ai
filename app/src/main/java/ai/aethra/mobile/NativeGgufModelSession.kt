@@ -24,7 +24,11 @@ class NativeGgufModelSession(
         check(!opened) { "GGUF model session is already open." }
         check(File(modelPath).isFile) { "GGUF model file is missing." }
         projectorPath?.let { check(File(it).isFile) { "Multimodal projector file is missing." } }
-        NativeGgufRuntime.nativeLoadModel(modelPath, projectorPath)
+        // If another session is generating, stop it before the process-wide model is replaced.
+        NativeGgufRuntime.nativeCancel()
+        check(NativeGgufRuntime.nativeLoadModel(modelPath, projectorPath)) {
+            "The native GGUF runtime did not load the selected model."
+        }
         opened = true
     }
 
@@ -42,6 +46,7 @@ class NativeGgufModelSession(
 
     override fun close() {
         if (opened) {
+            NativeGgufRuntime.nativeCancel()
             NativeGgufRuntime.nativeUnload()
             opened = false
         }
