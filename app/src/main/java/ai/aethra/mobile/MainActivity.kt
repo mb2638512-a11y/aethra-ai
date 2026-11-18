@@ -35,6 +35,7 @@ import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -288,6 +289,7 @@ private fun AethraChatScreen() {
                                 text = { Text("Stop running model") },
                                 enabled = sessionState.value != null,
                                 onClick = {
+                                    jobState.value?.cancel()
                                     sessionState.value?.close()
                                     sessionState.value = null
                                     selectedModel = "No model running"
@@ -304,7 +306,27 @@ private fun AethraChatScreen() {
                     IconButton(onClick = { showSettings = true }) {
                         Icon(Icons.Default.Settings, contentDescription = "Performance settings", tint = Color.White)
                     }
-                    IconButton(onClick = { messages.clear(); ChatHistoryStore.clear(context) }) {
+                    IconButton(
+                        enabled = messages.isNotEmpty(),
+                        onClick = {
+                            val transcript = messages.joinToString("\n\n") { message ->
+                                (if (message.fromUser) "You: " else "AETHRA: ") + message.text
+                            }
+                            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                                type = "text/plain"
+                                putExtra(Intent.EXTRA_SUBJECT, "AETHRA conversation")
+                                putExtra(Intent.EXTRA_TEXT, transcript)
+                            }
+                            context.startActivity(Intent.createChooser(shareIntent, "Share conversation"))
+                        }
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = "Export/share conversation", tint = Color.White)
+                    }
+                    IconButton(onClick = {
+                        jobState.value?.cancel()
+                        messages.clear()
+                        ChatHistoryStore.clear(context)
+                    }) {
                         Icon(Icons.Default.Add, contentDescription = "New chat", tint = Color.White)
                     }
                 },
