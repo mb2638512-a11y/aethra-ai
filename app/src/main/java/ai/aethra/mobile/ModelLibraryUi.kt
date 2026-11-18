@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
 @Composable
-fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Unit = {}) {
+fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Unit = {}, onDeleteModel: (ModelCandidate) -> Unit = {}) {
     val context = LocalContext.current
     val downloader = remember { ModelDownloadManager(context) }
     val activeDownloads = remember { mutableStateMapOf<String, List<Long>>() }
@@ -216,6 +216,14 @@ fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Un
                                         activeDownloads.remove(model.id)
                                         ModelDownloadStore.clear(context, model.id)
                                     }) { Text("Cancel") }
+                                }
+                                if (filesPresentCount > 0 || ids.isNotEmpty()) {
+                                    TextButton(onClick = {
+                                        onDeleteModel(model)
+                                        activeDownloads.remove(model.id)
+                                        ids.forEach { snapshots.remove(it) }
+                                        ModelDownloadStore.clear(context, model.id)
+                                    }) { Text("Delete files") }
                                 }
                             }
                         }
