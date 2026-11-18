@@ -150,6 +150,18 @@ private fun AethraChatScreen() {
         ChatHistoryStore.save(context, messages.toList())
     }
 
+    // Start the default model only if it is already installed and passes device safety checks.
+    LaunchedEffect(Unit) {
+        val defaultModel = availableChatModels(context).firstOrNull()
+        if (defaultModel != null && sessionState.value == null) {
+            runCatching {
+                ModelExecutionPolicy.assertCanLoad(context, defaultModel.minimumRamGb ?: 6, 0.25)
+                val modelFile = File(context.getExternalFilesDir(null), "models/gemma-4-E2B-it.litertlm")
+                LiteRtModelSession(modelFile.absolutePath).also { it.open() }
+            }.onSuccess { sessionState.value = it }
+        }
+    }
+
     Scaffold(
         containerColor = Night,
         topBar = {
