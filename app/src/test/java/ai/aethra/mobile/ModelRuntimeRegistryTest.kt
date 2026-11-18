@@ -72,4 +72,19 @@ class ModelRuntimeRegistryTest {
         })
         assertTrue(ModelAssets.byModel.values.all { assets -> assets.isNotEmpty() && assets.all { it.url.startsWith("https://huggingface.co/") } })
     }
+
+    @Test
+    fun partialFilesCannotEnableModelRunWhileDownloadIsActive() {
+        val active = DownloadSnapshot(1L, android.app.DownloadManager.STATUS_RUNNING, 100L, 1000L, null, 0)
+        assertFalse(ModelDownloadReadiness.isReady(true, 1, listOf(active)))
+    }
+
+    @Test
+    fun modelRunRequiresAllSavedDownloadsToFinishSuccessfully() {
+        val complete = DownloadSnapshot(1L, android.app.DownloadManager.STATUS_SUCCESSFUL, 1000L, 1000L, null, 0)
+        val failed = DownloadSnapshot(2L, android.app.DownloadManager.STATUS_FAILED, 0L, 1000L, null, 1001)
+        assertTrue(ModelDownloadReadiness.isReady(true, 1, listOf(complete)))
+        assertFalse(ModelDownloadReadiness.isReady(true, 2, listOf(complete, failed)))
+        assertFalse(ModelDownloadReadiness.isReady(false, 1, listOf(complete)))
+    }
 }
