@@ -26,7 +26,7 @@ CMake options:
 
 The Kotlin `NativeGgufRuntime` JNI facade and `NativeGgufModelSession` wrapper are implemented. The C++ JNI bridge loads GGUF weights, optionally loads an `mmproj`, queries native modality capabilities, sends text/image/audio parts through libmtmd, runs token generation, supports cooperative cancellation, and unloads native resources. The app Gradle build compiles and packages `libaethra_llama_jni.so` plus the pinned llama.cpp/libmtmd dependencies for `arm64-v8a`. The latest Android debug APK was inspected and contains these libraries and all six expected JNI exports.
 
-The JNI session is intentionally not registered as runnable in Model Library yet. It returns a completed response string rather than streaming token deltas. The native build disables FFmpeg video helpers; synchronized LFM3-Omni video input and native audio generation are not implemented in this adapter. No LFM3-Omni or MiniCPM-V inference has yet been validated on the user's physical phone.
+The JNI session is intentionally not registered as runnable in Model Library yet. The current bridge streams token pieces to Kotlin Flow; the legacy whole-response JNI entry point remains for compatibility. The native build disables FFmpeg video helpers; synchronized LFM3-Omni video input and native audio generation are not implemented in this adapter. No LFM3-Omni or MiniCPM-V inference has yet been validated on the user's physical phone.
 
 ## Remaining JNI/model validation
 
