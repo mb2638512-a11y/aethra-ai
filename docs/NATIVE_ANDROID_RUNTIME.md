@@ -6,7 +6,7 @@
 - Tag: \`b11960\` (llama.cpp v0.8.0)
 - Resolved commit: \`8642541b255bfb5dc39cd351a178be09013a55d6\`
 - Android ABI: \`arm64-v8a\`
-- Minimum native platform: Android API 28
+- Minimum native platform: Android API 26 (matches the app minSdk)
 - Libraries to validate: \`libllama.so\` and \`libmtmd.so\`
 
 The pin is intentional: model files and the native ABI must be tested against one reproducible upstream revision. Upgrade only after model-specific regression tests pass.
@@ -22,7 +22,13 @@ CMake options:
 - \`LLAMA_BUILD_COMMON=OFF\`, \`LLAMA_BUILD_TOOLS=OFF\`, \`LLAMA_BUILD_TESTS=OFF\`
 - \`LLAMA_BUILD_MTMD=ON\`, \`MTMD_VIDEO=OFF\`, \`BUILD_SHARED_LIBS=ON\`
 
-## JNI contract to implement after native build validation
+## JNI implementation status
+
+The Kotlin `NativeGgufRuntime` JNI facade and `NativeGgufModelSession` wrapper are implemented. The C++ JNI bridge loads GGUF weights, optionally loads an `mmproj`, queries native modality capabilities, sends text/image/audio parts through libmtmd, runs token generation, supports cooperative cancellation, and unloads native resources. The app Gradle build compiles and packages `libaethra_llama_jni.so` plus the pinned llama.cpp/libmtmd dependencies for `arm64-v8a`. The latest Android debug APK was inspected and contains these libraries and all six expected JNI exports.
+
+The JNI session is intentionally not registered as runnable in Model Library yet. It returns a completed response string rather than streaming token deltas. The native build disables FFmpeg video helpers; synchronized LFM3-Omni video input and native audio generation are not implemented in this adapter. No LFM3-Omni or MiniCPM-V inference has yet been validated on the user's physical phone.
+
+## Remaining JNI/model validation
 
 1. One process-wide native session; opening a new model must unload the prior session first.
 2. Load a GGUF text model and its matching projector (\`mmproj\`) as a single session. Reject missing/mismatched projector files before allocating the model.
@@ -40,4 +46,4 @@ CMake options:
 
 ## Current state
 
-The native build workflow is a separate validation step. It does not yet package a GGUF runtime in the AETHRA APK, and the two GGUF catalogue entries remain download-only. Gemma 4 E2B continues to use its existing LiteRT-LM adapter.
+The native libraries and JNI bridge are compiled and packaged into the arm64 debug APK. The GGUF Kotlin session wrapper is present but deliberately hidden from Model Library: the two GGUF catalogue entries remain download-only until model/projector inference and physical-device tests pass. Gemma 4 E2B continues to use its existing LiteRT-LM adapter.
