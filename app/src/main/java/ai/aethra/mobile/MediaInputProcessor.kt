@@ -105,12 +105,14 @@ object MediaInputProcessor {
         var file: File? = null
         try {
             val scale = minOf(1f, maxDimension.toFloat() / maxOf(decoded.width, decoded.height).toFloat())
-            resized = if (scale < 1f) Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true) else decoded
-            file = File.createTempFile("aethra_image_", ".jpg", context.cacheDir)
-            FileOutputStream(file).use { output ->
-                check(resized.compress(Bitmap.CompressFormat.JPEG, 88, output)) { "Could not encode selected image." }
+            val outputBitmap = if (scale < 1f) Bitmap.createScaledBitmap(decoded, (decoded.width * scale).toInt(), (decoded.height * scale).toInt(), true) else decoded
+            resized = outputBitmap
+            val outputFile = File.createTempFile("aethra_image_", ".jpg", context.cacheDir)
+            file = outputFile
+            FileOutputStream(outputFile).use { output ->
+                check(outputBitmap.compress(Bitmap.CompressFormat.JPEG, 88, output)) { "Could not encode selected image." }
             }
-            return file
+            return outputFile
         } catch (error: Throwable) {
             file?.delete()
             throw error
