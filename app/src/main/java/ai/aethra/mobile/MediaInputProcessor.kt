@@ -66,17 +66,17 @@ object MediaInputProcessor {
                     val frames = extractVideoFrames(context, uri, maxVideoFrames)
                     check(frames.isNotEmpty()) { "Could not decode frames from this video." }
                     files += frames
-                    val audioTrack = extractVideoAudio(context, uri)
+                    val audioTrack = extractVideoAudio(context, uri, MediaProcessingPreferences.maxVideoAudioSeconds(context))
                     if (audioTrack != null) files += audioTrack
                     contents.clear()
                     contents += Content.Text(
                         (if (prompt.isBlank()) "Summarize this video using its sampled frames" else prompt) +
-                            if (audioTrack != null) ". A separate audio track from the first 60 seconds is also attached." else ". Video soundtrack could not be extracted; analyze the sampled frames only."
+                            if (audioTrack != null) ". A separate audio track from the first ${MediaProcessingPreferences.maxVideoAudioSeconds(context)} seconds is also attached." else ". Video soundtrack could not be extracted; analyze the sampled frames only."
                     )
                     frames.forEach { contents += Content.ImageFile(it.absolutePath) }
                     if (audioTrack != null) contents += Content.AudioFile(audioTrack.absolutePath)
                     note = if (audioTrack != null) {
-                        "Video sampled into ${frames.size} image frames; audio from up to the first 60 seconds is attached separately."
+                        "Video sampled into ${frames.size} image frames; audio from up to the first ${MediaProcessingPreferences.maxVideoAudioSeconds(context)} seconds is attached separately."
                     } else {
                         "Video sampled into ${frames.size} image frames. No usable audio track was extracted."
                     }
@@ -179,7 +179,7 @@ object MediaInputProcessor {
      * Extracts a bounded audio segment from a video container into an M4A file.
      * Compressed samples are remuxed without decoding/re-encoding.
      */
-    private fun extractVideoAudio(context: Context, uri: Uri): File? {
+    private fun extractVideoAudio(context: Context, uri: Uri, maxSeconds: Int): File? {
         val extractor = MediaExtractor()
         var output: File? = null
         var muxer: MediaMuxer? = null
@@ -202,7 +202,7 @@ object MediaInputProcessor {
             )
             val buffer = java.nio.ByteBuffer.allocateDirect(capacity)
             val info = MediaCodec.BufferInfo()
-            val maxDurationUs = 60_000_000L
+            val maxDurationUs = maxSeconds.coerceIn(15, 180) * 1_000_000L
             while (true) {
                 buffer.clear()
                 val size = extractor.readSampleData(buffer, 0)
