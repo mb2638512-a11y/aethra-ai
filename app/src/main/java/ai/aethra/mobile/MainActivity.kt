@@ -5,6 +5,7 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import android.content.Intent
 import android.speech.RecognizerIntent
+import android.speech.tts.TextToSpeech
 import java.util.Locale
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -176,6 +177,13 @@ private fun AethraChatScreen() {
     var showModelLibrary by remember { mutableStateOf(false) }
     var generating by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val speechOutput = remember(context) { TextToSpeech(context) { } }
+    DisposableEffect(speechOutput) {
+        onDispose {
+            speechOutput.stop()
+            speechOutput.shutdown()
+        }
+    }
     val sessionState = remember { mutableStateOf<LiteRtModelSession?>(null) }
     val jobState = remember { mutableStateOf<Job?>(null) }
 
@@ -478,7 +486,18 @@ private fun AethraChatScreen() {
                                 shape = RoundedCornerShape(18.dp),
                                 modifier = Modifier.widthIn(max = 310.dp)
                             ) {
-                                Text(message.text, Modifier.padding(14.dp), fontSize = 14.sp, lineHeight = 21.sp)
+                                Row(
+                                    Modifier.padding(start = 14.dp, end = 8.dp, top = 8.dp, bottom = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(message.text, Modifier.weight(1f).padding(vertical = 6.dp), fontSize = 14.sp, lineHeight = 21.sp)
+                                    if (!message.fromUser && message.text.isNotBlank()) {
+                                        TextButton(onClick = {
+                                            speechOutput.language = Locale.getDefault()
+                                            speechOutput.speak(message.text, TextToSpeech.QUEUE_FLUSH, null, "aethra-${messages.indexOf(message)}")
+                                        }) { Text("Speak", fontSize = 10.sp) }
+                                    }
+                                }
                             }
                         }
                     }
@@ -498,9 +517,17 @@ private fun AethraChatScreen() {
     if (infoDialog) {
         AlertDialog(
             onDismissRequest = { infoDialog = false },
-            title = { Text("AETHRA AI") },
-            text = { Text("AETHRA uses local model inference when a supported model is installed. Gemma 4 E2B is the first LiteRT-LM target. LFM3 and MiniCPM still need their Android inference runtime. Downloads are verified before Gemma is loaded.") },
-            confirmButton = { TextButton(onClick = { infoDialog = false }) { Text("Understood") } },
+            title = { Text("AETHRA Workspace") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Navigate your local AI workspace.")
+                    TextButton(onClick = { showModelLibrary = true; infoDialog = false }) { Text("Model Library & Downloads") }
+                    TextButton(onClick = { showSettings = true; infoDialog = false }) { Text("Runtime & Device Settings") }
+                    TextButton(onClick = { messages.clear(); ChatHistoryStore.clear(context); infoDialog = false }) { Text("New Chat / Clear History") }
+                    Text("Input: text, file picker and device speech recognition. Output: text and device text-to-speech. Image/audio/video model inference is not yet wired to the active runtime.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                }
+            },
+            confirmButton = { TextButton(onClick = { infoDialog = false }) { Text("Close") } },
             containerColor = Panel
         )
     }
