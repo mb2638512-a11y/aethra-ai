@@ -33,7 +33,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
 @Composable
-fun ModelLibraryDialog(onDismiss: () -> Unit) {
+fun ModelLibraryDialog(onDismiss: () -> Unit, onRunModel: (ModelCandidate) -> Unit = {}) {
     val context = LocalContext.current
     val downloader = remember { ModelDownloadManager(context) }
     val activeDownloads = remember { mutableStateMapOf<String, List<Long>>() }
@@ -144,6 +144,9 @@ fun ModelLibraryDialog(onDismiss: () -> Unit) {
                                 }
                             }
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (ModelRuntimeRegistry.isRunnableOnAndroid(model.id) && filesPresent) {
+                                    OutlinedButton(onClick = { onRunModel(model); onDismiss() }) { Text("Run") }
+                                }
                                 Button(
                                     enabled = assets.isNotEmpty() && ids.isEmpty() && !allDone,
                                     onClick = {
