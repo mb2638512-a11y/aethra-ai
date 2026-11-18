@@ -89,15 +89,25 @@ object ModelDownloadReadiness {
 object ModelDownloadStore {
     private const val PREFS = "aethra_model_downloads"
     fun save(context: Context, modelId: String, ids: List<Long>) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putString(modelId, ids.joinToString(","))
-            .apply()
+        val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val editor = preferences.edit()
+        load(context, modelId).forEach { editor.remove("asset_$it") }
+        editor.putString(modelId, ids.joinToString(",")).apply()
     }
     fun load(context: Context, modelId: String): List<Long> =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(modelId, null)
             ?.split(",")?.mapNotNull { it.toLongOrNull() }.orEmpty()
+    fun saveAssetName(context: Context, downloadId: Long, fileName: String) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString("asset_$downloadId", fileName).apply()
+    }
+    fun assetName(context: Context, downloadId: Long): String? =
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("asset_$downloadId", null)
     fun clear(context: Context, modelId: String) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(modelId).apply()
+        val preferences = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val editor = preferences.edit().remove(modelId)
+        load(context, modelId).forEach { editor.remove("asset_$it") }
+        editor.apply()
     }
 }
 
@@ -108,10 +118,11 @@ class ModelDownloadManager(context: Context) {
     fun enqueueModel(modelId: String): List<Long> = enqueueMissingModel(modelId)
 
     /** Enqueue only assets that are not already present, allowing failed/partial downloads to retry safely. */
-    fun enqueueMissingModel(modelId: String): List<Long> {
+    fun enqueueMissingModel(modelId: String, retryFileNames: Set<String> = emptySet()): List<Long> {
         val assets = ModelAssets.byModel[modelId]
             ?: throw IllegalArgumentException("Unknown model: $modelId")
         val destination = modelDirectory()
+        retryFileNames.forEach { File(destination, it).delete() }
         val missing = assets.filter { asset ->
             val file = File(destination, asset.fileName)
             !file.isFile || file.length() <= 0L
@@ -126,7 +137,9 @@ class ModelDownloadManager(context: Context) {
                 .setAllowedOverRoaming(false)
                 .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
                 .setDestinationUri(Uri.fromFile(target))
-            manager.enqueue(request)
+            manager.enqueue(request).also { downloadId ->
+                ModelDownloadStore.saveAssetName(appContext, downloadId, asset.fileName)
+            }
         }
     }
 
@@ -153,6 +166,12 @@ class ModelDownloadManager(context: Context) {
 
     fun cancel(vararg downloadIds: Long) {
         if (downloadIds.isNotEmpty()) manager.remove(*downloadIds)
+    }
+
+    fun cancelAndDeletePartial(downloadIds: List<Long>) {
+        cancel(*downloadIds.toLongArray())
+        downloadIds.mapNotNull { ModelDownloadStore.assetName(appContext, it) }
+            .forEach { File(modelDirectory(), it).delete() }
     }
 
     fun modelDirectory(): File =
